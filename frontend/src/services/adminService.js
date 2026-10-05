@@ -98,7 +98,6 @@ export const createStudent = async (studentData) => {
     joiningDate: new Date().toISOString().split('T')[0]
   };
   studentsData.push(newStudent);
-  console.log('✅ [MOCK] Student created:', newStudent.fullName);
   return newStudent;
 };
 
@@ -107,7 +106,6 @@ export const updateStudent = async (id, studentData) => {
   const index = studentsData.findIndex(s => s.id === parseInt(id));
   if (index !== -1) {
     studentsData[index] = { ...studentsData[index], ...studentData };
-    console.log('✅ [MOCK] Student updated:', studentsData[index].fullName);
     return studentsData[index];
   }
   throw new Error('Student not found');
@@ -117,9 +115,7 @@ export const deleteStudent = async (id) => {
   await delay(700);
   const index = studentsData.findIndex(s => s.id === parseInt(id));
   if (index !== -1) {
-    const student = studentsData[index];
     studentsData.splice(index, 1);
-    console.log('✅ [MOCK] Student deleted:', student.fullName);
     return true;
   }
   throw new Error('Student not found');
@@ -174,7 +170,6 @@ export const allocateRoom = async (studentId, roomId) => {
 
   room.students.push(studentId);
   room.occupied += 1;
-  console.log('✅ [MOCK] Room allocated:', room.number, 'to student', studentId);
   return room;
 };
 
@@ -187,7 +182,6 @@ export const deallocateRoom = async (studentId, roomId) => {
   if (studentIndex > -1) {
     room.students.splice(studentIndex, 1);
     room.occupied -= 1;
-    console.log('✅ [MOCK] Room deallocated:', room.number, 'from student', studentId);
     return room;
   }
   throw new Error('Student not in this room');
@@ -231,7 +225,6 @@ export const createFeeRecord = async (feeData) => {
     paidDate: feeData.paid > 0 ? new Date().toISOString().split('T')[0] : null
   };
   feesData.push(newFee);
-  console.log('✅ [MOCK] Fee record created for:', newFee.studentName);
   return newFee;
 };
 
@@ -246,7 +239,6 @@ export const updateFeeRecord = async (id, feeData) => {
       status: feeData.paid >= feeData.amount ? 'paid' :
               feeData.paid > 0 ? 'partial' : 'pending'
     };
-    console.log('✅ [MOCK] Fee record updated for:', feesData[index].studentName);
     return feesData[index];
   }
   throw new Error('Fee record not found');
@@ -274,7 +266,6 @@ export const createMessMenu = async (menuData) => {
     ...menuData
   };
   messData.push(newMenu);
-  console.log('✅ [MOCK] Mess menu created for:', menuData.date);
   return newMenu;
 };
 
@@ -283,7 +274,6 @@ export const updateMessMenu = async (id, menuData) => {
   const index = messData.findIndex(m => m.id === parseInt(id));
   if (index !== -1) {
     messData[index] = { ...messData[index], ...menuData };
-    console.log('✅ [MOCK] Mess menu updated for:', messData[index].date);
     return messData[index];
   }
   throw new Error('Menu not found');
@@ -293,9 +283,7 @@ export const deleteMessMenu = async (id) => {
   await delay(700);
   const index = messData.findIndex(m => m.id === parseInt(id));
   if (index !== -1) {
-    const menu = messData[index];
     messData.splice(index, 1);
-    console.log('✅ [MOCK] Mess menu deleted for:', menu.date);
     return true;
   }
   throw new Error('Menu not found');
@@ -333,7 +321,6 @@ export const createMovementRecord = async (movementData) => {
     actualReturn: null
   };
   movementsData.push(newMovement);
-  console.log('✅ [MOCK] Movement record created for:', movementData.studentName);
   return newMovement;
 };
 
@@ -342,7 +329,6 @@ export const updateMovementRecord = async (id, movementData) => {
   const index = movementsData.findIndex(m => m.id === parseInt(id));
   if (index !== -1) {
     movementsData[index] = { ...movementsData[index], ...movementData };
-    console.log('✅ [MOCK] Movement record updated for:', movementsData[index].studentName);
     return movementsData[index];
   }
   throw new Error('Movement record not found');
@@ -390,7 +376,6 @@ export const updateGrievanceStatus = async (id, status) => {
   if (index !== -1) {
     grievancesData[index].status = status;
     grievancesData[index].updatedDate = new Date().toISOString();
-    console.log('✅ [MOCK] Grievance status updated to:', status);
     return grievancesData[index];
   }
   throw new Error('Grievance not found');
@@ -408,7 +393,6 @@ export const addGrievanceResponse = async (id, response) => {
     };
     grievancesData[index].responses.push(newResponse);
     grievancesData[index].updatedDate = new Date().toISOString();
-    console.log('✅ [MOCK] Response added to grievance #', id);
     return grievancesData[index];
   }
   throw new Error('Grievance not found');
@@ -455,7 +439,6 @@ export const createNotice = async (noticeData) => {
     author: 'Admin'
   };
   noticesData.push(newNotice);
-  console.log('✅ [MOCK] Notice created:', newNotice.title);
   return newNotice;
 };
 
@@ -464,7 +447,6 @@ export const updateNotice = async (id, noticeData) => {
   const index = noticesData.findIndex(n => n.id === parseInt(id));
   if (index !== -1) {
     noticesData[index] = { ...noticesData[index], ...noticeData };
-    console.log('✅ [MOCK] Notice updated:', noticesData[index].title);
     return noticesData[index];
   }
   throw new Error('Notice not found');
@@ -474,9 +456,7 @@ export const deleteNotice = async (id) => {
   await delay(700);
   const index = noticesData.findIndex(n => n.id === parseInt(id));
   if (index !== -1) {
-    const notice = noticesData[index];
     noticesData.splice(index, 1);
-    console.log('✅ [MOCK] Notice deleted:', notice.title);
     return true;
   }
   throw new Error('Notice not found');
