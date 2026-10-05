@@ -1,34 +1,42 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
-/**
- * PageTransition component wraps page content with smooth fade-in animations
- * Triggers on route changes for a premium feel
- */
-const PageTransition = ({ children }) => {
+function PageTransition({ children }) {
   const location = useLocation();
+
   const [displayLocation, setDisplayLocation] = useState(location);
   const [transitionStage, setTransitionStage] = useState('fadeIn');
 
   useEffect(() => {
-    if (location !== displayLocation) {
-      setTransitionStage('fadeOut');
+    if (location.pathname === displayLocation.pathname) {
+      return;
     }
+
+    const timer = setTimeout(() => {
+      setTransitionStage('fadeOut');
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [location, displayLocation]);
 
+  useEffect(() => {
+    if (transitionStage !== 'fadeOut') {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDisplayLocation(location);
+      setTransitionStage('fadeIn');
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [transitionStage, location]);
+
   return (
-    <div
-      className={`page-transition ${transitionStage}`}
-      onAnimationEnd={() => {
-        if (transitionStage === 'fadeOut') {
-          setTransitionStage('fadeIn');
-          setDisplayLocation(location);
-        }
-      }}
-    >
+    <div className={`page-transition ${transitionStage}`}>
       {children}
     </div>
   );
-};
+}
 
 export default PageTransition;
