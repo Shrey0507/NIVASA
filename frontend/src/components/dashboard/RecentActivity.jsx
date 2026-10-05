@@ -33,14 +33,14 @@ const RecentActivity = ({ activities }) => {
     );
   }
 
-  const getActivityIcon = (type) => {
+  const getActivityColor = (type) => {
     switch (type) {
-      case 'registration': return '👤';
-      case 'allocation': return '🏠';
-      case 'fee': return '💰';
-      case 'movement': return '🚪';
-      case 'grievance': return '📝';
-      default: return '📋';
+      case 'registration': return 'hsl(var(--primary))';
+      case 'allocation': return 'hsl(var(--success))';
+      case 'fee': return 'hsl(var(--warning))';
+      case 'movement': return 'hsl(var(--muted-foreground))';
+      case 'grievance': return 'hsl(var(--destructive))';
+      default: return 'hsl(var(--muted-foreground))';
     }
   };
 
@@ -55,11 +55,18 @@ const RecentActivity = ({ activities }) => {
           {activities.map((activity) => (
             <div key={activity.id} style={{
               display: 'flex',
-              gap: '1rem',
+              gap: '0.75rem',
               paddingBottom: '1rem',
               borderBottom: '1px solid hsl(var(--border))'
             }}>
-              <div style={{ fontSize: '1.5rem' }}>{getActivityIcon(activity.type)}</div>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: getActivityColor(activity.type),
+                marginTop: '0.375rem',
+                flexShrink: 0,
+              }}></div>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: '0.875rem', marginBottom: '0.25rem' }}>
                   {activity.message}
