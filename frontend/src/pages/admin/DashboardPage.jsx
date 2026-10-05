@@ -102,25 +102,21 @@ const DashboardPage = () => {
             title="Total Students"
             value={stats?.totalStudents || 0}
             description="Current registered residents"
-            icon="👥"
           />
           <StatCard
             title="Room Occupancy"
             value={`${stats?.roomOccupancy?.percentage?.toFixed(1) || 0}%`}
             description={`${stats?.roomOccupancy?.occupied || 0} / ${stats?.roomOccupancy?.total || 0} beds occupied`}
-            icon="🏠"
           />
           <StatCard
             title="Pending Fees"
             value={`₹${(stats?.pendingFees || 0).toLocaleString('en-IN')}`}
             description="Outstanding balance"
-            icon="💰"
           />
           <StatCard
             title="Open Grievances"
             value={stats?.openGrievances || 0}
             description="Unresolved complaints"
-            icon="📝"
           />
         </div>
 
