@@ -241,7 +241,7 @@ const StudentForm = ({ student, onClose }) => {
             </div>
 
             <p style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))', marginTop: '1rem' }}>
-              ℹ️ Room assignment is managed through the Room Allocation module.
+              Room assignment is managed through the Room Allocation module.
             </p>
           </div>
 
