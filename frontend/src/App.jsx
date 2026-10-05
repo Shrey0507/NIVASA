@@ -9,17 +9,14 @@ import MessPage from './pages/admin/MessPage';
 import MovementsPage from './pages/admin/MovementsPage';
 import GrievancesPage from './pages/admin/GrievancesPage';
 import NoticesPage from './pages/admin/NoticesPage';
-import './theme.css';
+import CredentialsPage from './pages/admin/CredentialsPage';
 
 function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
-          {/* Redirect root to admin dashboard */}
           <Route path="/" element={<Navigate to="/admin" replace />} />
-
-          {/* Admin Routes */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="students" element={<StudentsPage />} />
@@ -29,9 +26,8 @@ function App() {
             <Route path="movements" element={<MovementsPage />} />
             <Route path="grievances" element={<GrievancesPage />} />
             <Route path="notices" element={<NoticesPage />} />
+            <Route path="credentials" element={<CredentialsPage />} />
           </Route>
-
-          {/* Catch all - redirect to admin */}
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </BrowserRouter>
