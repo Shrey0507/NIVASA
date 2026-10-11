@@ -1,348 +1,334 @@
-import { useState, useEffect } from 'react';
-import AdminHeader from '../../components/layout/AdminHeader';
-import { getGrievances, getGrievanceById, updateGrievanceStatus, addGrievanceResponse } from '../../services/adminService';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MessageSquareWarning, Search } from "lucide-react";
 
-const GrievancesPage = () => {
-  const [grievances, setGrievances] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showDetailDialog, setShowDetailDialog] = useState(false);
-  const [selectedGrievance, setSelectedGrievance] = useState(null);
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    category: '',
-    priority: ''
+import {
+  addGrievanceResponse,
+  getGrievances,
+  updateGrievanceStatus,
+} from "@/services/adminService";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatCard } from "@/components/common/StatCard";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { EmptyState } from "@/components/common/EmptyState";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const ALL = "all";
+
+const formatDateTime = (iso) =>
+  new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
-  const loadGrievances = async () => {
+const priorityBorder = {
+  high: "border-l-destructive",
+  medium: "border-l-warning",
+  low: "border-l-info",
+};
+
+export default function GrievancesPage() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState(ALL);
+  const [category, setCategory] = useState(ALL);
+  const [priority, setPriority] = useState(ALL);
+  const [active, setActive] = useState(null);
+
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getGrievances(filters);
-      setGrievances(data);
+      const data = await getGrievances({
+        search,
+        status: status === ALL ? "" : status,
+        category: category === ALL ? "" : category,
+        priority: priority === ALL ? "" : priority,
+      });
+      setItems(data);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading grievances:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, status, category, priority]);
 
   useEffect(() => {
-    loadGrievances(); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+    load();
+  }, [load]);
 
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleViewDetails = async (grievance) => {
-    try {
-      const fullGrievance = await getGrievanceById(grievance.id);
-      setSelectedGrievance(fullGrievance);
-      setShowDetailDialog(true);
-    } catch (err) {
-      alert('Error loading grievance details: ' + err.message);
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'open':
-        return <span className="badge badge-warning">Open</span>;
-      case 'in_progress':
-        return <span className="badge badge-default">In Progress</span>;
-      case 'resolved':
-        return <span className="badge badge-success">Resolved</span>;
-      default:
-        return <span className="badge badge-default">{status}</span>;
-    }
-  };
-
-  const getPriorityBadge = (priority) => {
-    switch (priority) {
-      case 'high':
-        return <span className="badge badge-destructive">High</span>;
-      case 'medium':
-        return <span className="badge badge-warning">Medium</span>;
-      case 'low':
-        return <span className="badge badge-default">Low</span>;
-      default:
-        return null;
-    }
-  };
-
-  const formatDateTime = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const stats = useMemo(
+    () => ({
+      open: items.filter((g) => g.status === "open").length,
+      inProgress: items.filter((g) => g.status === "in_progress").length,
+      resolved: items.filter((g) => g.status === "resolved").length,
+    }),
+    [items],
+  );
 
   return (
     <>
-      <AdminHeader title="Grievances" />
-      <div className="admin-content">
-        <div className="page-header">
-          <h1 className="page-title">Grievances</h1>
-          <p className="page-subtitle">Manage student complaints and issues</p>
-        </div>
+      <PageHeader
+        title="Grievances"
+        description="Review, respond to and resolve resident complaints."
+      />
 
-        {/* Filters */}
-        <div className="filters-bar">
-          <input
-            type="text"
-            className="form-input search-input"
-            placeholder="Search by student or subject..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-          />
-          <select
-            className="form-select"
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-          >
-            <option value="">All Status</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-          </select>
-          <select
-            className="form-select"
-            value={filters.category}
-            onChange={(e) => handleFilterChange('category', e.target.value)}
-          >
-            <option value="">All Categories</option>
-            <option value="Infrastructure">Infrastructure</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Mess">Mess</option>
-            <option value="Security">Security</option>
-          </select>
-          <select
-            className="form-select"
-            value={filters.priority}
-            onChange={(e) => handleFilterChange('priority', e.target.value)}
-          >
-            <option value="">All Priority</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-
-        {/* Table */}
-        {loading ? (
-          <div className="loading">
-            <div className="spinner"></div>
-          </div>
-        ) : error ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">Error loading grievances</p>
-                <p>{error}</p>
-                <button className="btn btn-primary" onClick={loadGrievances} style={{ marginTop: '1rem' }}>
-                  Retry
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : grievances.length === 0 ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">No grievances found</p>
-                <p>Try adjusting your filters.</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Student</th>
-                  <th>Category</th>
-                  <th>Subject</th>
-                  <th>Submitted</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {grievances.map((grievance) => (
-                  <tr key={grievance.id}>
-                    <td>#{grievance.id}</td>
-                    <td>
-                      <div style={{ fontWeight: '500' }}>{grievance.studentName}</div>
-                      <div style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))' }}>
-                        {grievance.usn}
-                      </div>
-                    </td>
-                    <td>{grievance.category}</td>
-                    <td>{grievance.subject}</td>
-                    <td>{formatDateTime(grievance.submittedDate)}</td>
-                    <td>{getPriorityBadge(grievance.priority)}</td>
-                    <td>{getStatusBadge(grievance.status)}</td>
-                    <td>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => handleViewDetails(grievance)}
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Open"
+          value={stats.open}
+          accent="bg-destructive/10 text-destructive"
+        />
+        <StatCard
+          label="In progress"
+          value={stats.inProgress}
+          accent="bg-warning/10 text-warning"
+        />
+        <StatCard
+          label="Resolved"
+          value={stats.resolved}
+          accent="bg-success/10 text-success"
+        />
       </div>
 
-      {/* Detail Dialog */}
-      {showDetailDialog && selectedGrievance && (
-        <GrievanceDetailDialog
-          grievance={selectedGrievance}
-          onClose={(updated) => {
-            setShowDetailDialog(false);
-            setSelectedGrievance(null);
-            if (updated) loadGrievances();
-          }}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative flex-1 sm:min-w-[220px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by student or subject..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="sm:w-[150px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All status</SelectItem>
+            <SelectItem value="open">Open</SelectItem>
+            <SelectItem value="in_progress">In progress</SelectItem>
+            <SelectItem value="resolved">Resolved</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={priority} onValueChange={setPriority}>
+          <SelectTrigger className="sm:w-[140px]">
+            <SelectValue placeholder="Priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All priority</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="low">Low</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : error ? (
+        <EmptyState
+          title="Failed to load grievances"
+          description={error}
+          action={
+            <Button variant="outline" onClick={load}>
+              Retry
+            </Button>
+          }
         />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={MessageSquareWarning}
+          title="No grievances found"
+          description="Complaints matching your filters will appear here."
+        />
+      ) : (
+        <div className="space-y-3">
+          {items.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => setActive(g)}
+              className={cn(
+                "flex w-full flex-col gap-2 rounded-xl border border-l-4 bg-card p-4 text-left transition-all hover:shadow-md",
+                priorityBorder[g.priority],
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium">{g.subject}</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="capitalize">
+                    {g.priority}
+                  </Badge>
+                  <StatusBadge status={g.status} />
+                </div>
+              </div>
+              <p className="line-clamp-2 text-sm text-muted-foreground">
+                {g.description}
+              </p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {g.studentName}
+                </span>
+                <span>·</span>
+                <span>{g.category}</span>
+                <span>·</span>
+                <span>{formatDateTime(g.submittedDate)}</span>
+              </div>
+            </button>
+          ))}
+        </div>
       )}
+
+      <GrievanceDetail
+        grievance={active}
+        onClose={() => setActive(null)}
+        onChanged={load}
+      />
     </>
   );
-};
+}
 
-const GrievanceDetailDialog = ({ grievance, onClose }) => {
-  const [status, setStatus] = useState(grievance.status);
-  const [response, setResponse] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+function GrievanceDetail({ grievance, onClose, onChanged }) {
+  const [response, setResponse] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleUpdateStatus = async () => {
-    try {
-      setSubmitting(true);
-      await updateGrievanceStatus(grievance.id, status);
-      onClose(true);
-    } catch (err) {
-      alert('Error updating status: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
+  useEffect(() => {
+    setResponse("");
+  }, [grievance]);
+
+  if (!grievance) return null;
+
+  const setStatus = async (status) => {
+    setSaving(true);
+    const updated = await updateGrievanceStatus(grievance.id, status);
+    onChanged?.();
+    setSaving(false);
+    onClose();
+    return updated;
   };
 
-  const handleAddResponse = async () => {
-    if (!response.trim()) {
-      alert('Please enter a response');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      await addGrievanceResponse(grievance.id, response);
-      onClose(true);
-    } catch (err) {
-      alert('Error adding response: ' + err.message);
-    } finally {
-      setSubmitting(false);
-    }
+  const sendResponse = async () => {
+    if (!response.trim()) return;
+    setSaving(true);
+    await addGrievanceResponse(grievance.id, response.trim());
+    setResponse("");
+    setSaving(false);
+    onChanged?.();
+    onClose();
   };
 
   return (
-    <div className="dialog-overlay" onClick={() => onClose(false)}>
-      <div className="dialog-content" style={{ maxWidth: '700px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h2 className="dialog-title">Grievance #{grievance.id}</h2>
-        </div>
-        <div className="dialog-body">
-          {/* Student Info */}
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', backgroundColor: 'hsl(var(--muted))', borderRadius: 'var(--radius)' }}>
-            <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{grievance.studentName} ({grievance.usn})</div>
-            <div style={{ fontSize: '0.875rem', color: 'hsl(var(--muted-foreground))' }}>
-              {grievance.category} • Submitted: {new Date(grievance.submittedDate).toLocaleDateString('en-IN')}
-            </div>
+    <Dialog open={!!grievance} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{grievance.subject}</DialogTitle>
+          <DialogDescription>
+            {grievance.studentName} ({grievance.usn}) · {grievance.category} ·{" "}
+            {formatDateTime(grievance.submittedDate)}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="capitalize">
+              {grievance.priority} priority
+            </Badge>
+            <StatusBadge status={grievance.status} />
           </div>
 
-          {/* Complaint */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h4 style={{ fontSize: '0.9375rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-              {grievance.subject}
-            </h4>
-            <p style={{ fontSize: '0.875rem', color: 'hsl(var(--muted-foreground))', lineHeight: '1.6' }}>
-              {grievance.description}
+          <p className="rounded-lg bg-muted/50 p-3 text-sm">
+            {grievance.description}
+          </p>
+
+          <div>
+            <p className="mb-2 text-sm font-medium">
+              Responses ({grievance.responses.length})
             </p>
-          </div>
-
-          {/* Responses */}
-          {grievance.responses && grievance.responses.length > 0 && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{ fontSize: '0.9375rem', fontWeight: '600', marginBottom: '0.75rem' }}>Responses</h4>
-              {grievance.responses.map((resp) => (
-                <div key={resp.id} style={{
-                  padding: '0.75rem',
-                  marginBottom: '0.5rem',
-                  backgroundColor: 'hsl(var(--muted))',
-                  borderRadius: 'var(--radius)',
-                  fontSize: '0.875rem'
-                }}>
-                  <div style={{ fontWeight: '500', marginBottom: '0.25rem' }}>{resp.respondent}</div>
-                  <div style={{ marginBottom: '0.5rem' }}>{resp.message}</div>
-                  <div style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))' }}>
-                    {new Date(resp.timestamp).toLocaleString('en-IN')}
+            <div className="space-y-2">
+              {grievance.responses.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No responses yet.
+                </p>
+              ) : (
+                grievance.responses.map((r) => (
+                  <div key={r.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        {r.respondent}
+                      </span>
+                      <span>{formatDateTime(r.timestamp)}</span>
+                    </div>
+                    <p className="mt-1 text-sm">{r.message}</p>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-          )}
-
-          {/* Status Update */}
-          <div className="form-group">
-            <label className="form-label">Update Status</label>
-            <select
-              className="form-select"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
-              <option value="resolved">Resolved</option>
-            </select>
           </div>
 
-          {/* Add Response */}
-          <div className="form-group">
-            <label className="form-label">Add Response</label>
-            <textarea
-              className="form-textarea"
+          <Separator />
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Add a response</p>
+            <Textarea
               value={response}
               onChange={(e) => setResponse(e.target.value)}
-              placeholder="Enter your response..."
-              rows="4"
+              placeholder="Type your reply to the resident..."
             />
           </div>
-        </div>
-        <div className="dialog-footer">
-          <button className="btn btn-secondary" onClick={() => onClose(false)} disabled={submitting}>
-            Close
-          </button>
-          <button className="btn btn-primary" onClick={handleUpdateStatus} disabled={submitting}>
-            Update Status
-          </button>
-          <button className="btn btn-primary" onClick={handleAddResponse} disabled={submitting || !response.trim()}>
-            Add Response
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-export default GrievancesPage;
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={sendResponse} disabled={saving || !response.trim()}>
+              Send response
+            </Button>
+            {grievance.status !== "in_progress" && (
+              <Button
+                variant="outline"
+                onClick={() => setStatus("in_progress")}
+                disabled={saving}
+              >
+                Mark in progress
+              </Button>
+            )}
+            {grievance.status !== "resolved" && (
+              <Button
+                variant="secondary"
+                onClick={() => setStatus("resolved")}
+                disabled={saving}
+              >
+                Mark resolved
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

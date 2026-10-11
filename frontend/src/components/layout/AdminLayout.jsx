@@ -1,18 +1,25 @@
-import { Outlet } from 'react-router-dom';
-import AdminSidebar from './AdminSidebar';
-import PageTransition from './PageTransition';
+import { useNavigate } from "react-router-dom";
 
-const AdminLayout = () => {
+import { AppShell } from "./AppShell";
+import { adminNav } from "@/config/navigation";
+import { useAuth, ADMIN_ROLES } from "@/hooks/useAuth";
+
+export default function AdminLayout() {
+  const navigate = useNavigate();
+  const { user, role, logout } = useAuth();
+
+  const roleLabel = ADMIN_ROLES[role]?.label ?? "Admin";
+
   return (
-    <div className="admin-layout">
-      <AdminSidebar />
-      <div className="admin-main">
-        <PageTransition>
-          <Outlet />
-        </PageTransition>
-      </div>
-    </div>
+    <AppShell
+      nav={adminNav}
+      subtitle="Admin Console"
+      user={user || "Admin"}
+      role={roleLabel}
+      onLogout={() => {
+        logout();
+        navigate("/admin/login");
+      }}
+    />
   );
-};
-
-export default AdminLayout;
+}

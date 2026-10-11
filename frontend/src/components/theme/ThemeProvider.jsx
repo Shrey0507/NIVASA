@@ -1,59 +1,54 @@
 import { useEffect, useState } from 'react';
 import { ThemeContext } from './useTheme';
 
+const getSystemTheme = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+
+const getInitialTheme = () => {
+  if (typeof window === 'undefined') return 'system';
+  return localStorage.getItem('nivasa-theme') || 'system';
+};
+
 export const ThemeProvider = ({ children, ...props }) => {
-  const [theme, setTheme] = useState(() => {
-    // Check for saved theme preference or default to system
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('nivasa-theme');
-      if (saved) return saved;
+  const [theme, setTheme] = useState(getInitialTheme);
 
-      // Check system preference
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    return 'light';
-  });
-
+  // Apply the resolved theme to <html> whenever the preference changes.
   useEffect(() => {
-    const root = window.document.documentElement;
+    const root = document.documentElement;
+    const resolved = theme === 'system' ? getSystemTheme() : theme;
 
-    // Remove previous theme classes
     root.classList.remove('light', 'dark');
-
-    // Add current theme class
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      root.classList.add(systemTheme);
-    } else {
-      root.classList.add(theme);
-    }
+    root.classList.add(resolved);
+    root.style.colorScheme = resolved;
   }, [theme]);
 
+  // Persist the preference.
   useEffect(() => {
-    // Save theme preference
     localStorage.setItem('nivasa-theme', theme);
   }, [theme]);
 
+  // Follow the OS when the user has chosen "system".
   useEffect(() => {
-    // Listen for system theme changes when using system theme
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleChange = () => {
-        const root = window.document.documentElement;
-        root.classList.remove('light', 'dark');
-        root.classList.add(mediaQuery.matches ? 'dark' : 'light');
-      };
-
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
+    if (theme !== 'system') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      const root = document.documentElement;
+      const resolved = mediaQuery.matches ? 'dark' : 'light';
+      root.classList.remove('light', 'dark');
+      root.classList.add(resolved);
+      root.style.colorScheme = resolved;
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
   const value = {
     theme,
-    setTheme: (theme) => {
-      setTheme(theme);
-    },
+    setTheme,
+    resolvedTheme: theme === 'system' ? getSystemTheme() : theme,
   };
 
   return (

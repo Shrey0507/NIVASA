@@ -1,373 +1,370 @@
-import { useState, useEffect } from 'react';
-import AdminHeader from '../../components/layout/AdminHeader';
-import { getNotices, createNotice, updateNotice, deleteNotice } from '../../services/adminService';
+import { useCallback, useEffect, useState } from "react";
+import { Bell, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
-const NoticesPage = () => {
+import {
+  createNotice,
+  deleteNotice,
+  getNotices,
+  updateNotice,
+} from "@/services/adminService";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+
+const ALL = "all";
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+export default function NoticesPage() {
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedNotice, setSelectedNotice] = useState(null);
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    audience: ''
-  });
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState(ALL);
+  const [audience, setAudience] = useState(ALL);
+  const [editing, setEditing] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const loadNotices = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getNotices(filters);
+      const data = await getNotices({
+        search,
+        status: status === ALL ? "" : status,
+        audience: audience === ALL ? "" : audience,
+      });
       setNotices(data);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading notices:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, status, audience]);
 
   useEffect(() => {
-    loadNotices(); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+    load();
+  }, [load]);
 
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleAddNotice = () => {
-    setSelectedNotice(null);
-    setShowForm(true);
-  };
-
-  const handleEditNotice = (notice) => {
-    setSelectedNotice(notice);
-    setShowForm(true);
-  };
-
-  const handleDeleteNotice = async (notice) => {
-    if (!window.confirm(`Delete notice "${notice.title}"?`)) {
-      return;
-    }
-
-    try {
-      await deleteNotice(notice.id);
-      await loadNotices();
-    } catch (err) {
-      alert('Error deleting notice: ' + err.message);
-    }
-  };
-
-  const handleFormClose = (updated) => {
-    setShowForm(false);
-    setSelectedNotice(null);
-    if (updated) {
-      loadNotices();
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'published':
-        return <span className="badge badge-success">Published</span>;
-      case 'draft':
-        return <span className="badge badge-default">Draft</span>;
-      default:
-        return <span className="badge badge-default">{status}</span>;
-    }
-  };
-
-  const getAudienceBadge = (audience) => {
-    switch (audience) {
-      case 'all':
-        return <span className="badge badge-default">All Students</span>;
-      case 'boys':
-        return <span className="badge badge-default">Boys Hostel</span>;
-      case 'girls':
-        return <span className="badge badge-default">Girls Hostel</span>;
-      default:
-        return null;
-    }
+  const confirmDelete = async () => {
+    setDeleting(true);
+    await deleteNotice(deleteTarget.id);
+    setDeleting(false);
+    setDeleteTarget(null);
+    load();
   };
 
   return (
     <>
-      <AdminHeader title="Notices & Announcements" />
-      <div className="admin-content">
-        <div className="actions-bar">
-          <h1 className="page-title">Notices & Announcements</h1>
-          <button className="btn btn-primary" onClick={handleAddNotice}>
-            + Create Notice
-          </button>
-        </div>
+      <PageHeader
+        title="Notices"
+        description="Publish announcements for residents."
+      >
+        <Button onClick={() => setEditing("new")}>
+          <Plus /> New notice
+        </Button>
+      </PageHeader>
 
-        {/* Filters */}
-        <div className="filters-bar">
-          <input
-            type="text"
-            className="form-input search-input"
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative flex-1 sm:min-w-[240px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
             placeholder="Search notices..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-          <select
-            className="form-select"
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-          >
-            <option value="">All Status</option>
-            <option value="published">Published</option>
-            <option value="draft">Draft</option>
-          </select>
-          <select
-            className="form-select"
-            value={filters.audience}
-            onChange={(e) => handleFilterChange('audience', e.target.value)}
-          >
-            <option value="">All Audience</option>
-            <option value="all">All Students</option>
-            <option value="boys">Boys Hostel</option>
-            <option value="girls">Girls Hostel</option>
-          </select>
         </div>
-
-        {/* Notices List */}
-        {loading ? (
-          <div className="loading">
-            <div className="spinner"></div>
-          </div>
-        ) : error ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">Error loading notices</p>
-                <p>{error}</p>
-                <button className="btn btn-primary" onClick={loadNotices} style={{ marginTop: '1rem' }}>
-                  Retry
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : notices.length === 0 ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">No notices found</p>
-                <p>Create your first notice to get started.</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {notices.map((notice) => (
-              <div key={notice.id} className="card">
-                <div className="card-content">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <h3 style={{ fontSize: '1.125rem', fontWeight: '600', margin: 0 }}>
-                          {notice.title}
-                        </h3>
-                        {getStatusBadge(notice.status)}
-                        {getAudienceBadge(notice.audience)}
-                      </div>
-                      <p style={{ fontSize: '0.875rem', color: 'hsl(var(--muted-foreground))', marginBottom: '0.75rem', lineHeight: '1.6' }}>
-                        {notice.body}
-                      </p>
-                      <div style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))' }}>
-                        Published: {new Date(notice.publishDate).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}
-                        {notice.expiryDate && ` • Expires: ${new Date(notice.expiryDate).toLocaleDateString('en-IN', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric'
-                        })}`}
-                        {notice.author && ` • By: ${notice.author}`}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1rem' }}>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => handleEditNotice(notice)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => handleDeleteNotice(notice)}
-                        style={{ color: 'hsl(var(--destructive))' }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="sm:w-[150px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All status</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={audience} onValueChange={setAudience}>
+          <SelectTrigger className="sm:w-[160px]">
+            <SelectValue placeholder="Audience" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All audiences</SelectItem>
+            <SelectItem value="all">Everyone</SelectItem>
+            <SelectItem value="boys">Boys' Hostel</SelectItem>
+            <SelectItem value="girls">Girls' Hostel</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Notice Form Dialog */}
-      {showForm && (
-        <NoticeForm notice={selectedNotice} onClose={handleFormClose} />
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-40 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : error ? (
+        <EmptyState
+          title="Failed to load notices"
+          description={error}
+          action={
+            <Button variant="outline" onClick={load}>
+              Retry
+            </Button>
+          }
+        />
+      ) : notices.length === 0 ? (
+        <EmptyState
+          icon={Bell}
+          title="No notices found"
+          description="Create a notice to inform residents."
+          action={
+            <Button onClick={() => setEditing("new")}>
+              <Plus /> New notice
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {notices.map((n) => (
+            <div
+              key={n.id}
+              className="flex flex-col gap-3 rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold">{n.title}</p>
+                <StatusBadge status={n.status} />
+              </div>
+              <p className="line-clamp-3 flex-1 text-sm text-muted-foreground">
+                {n.body}
+              </p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Badge variant="outline" className="capitalize">
+                    {n.audience === "all" ? "Everyone" : n.audience}
+                  </Badge>
+                  <span>{formatDate(n.publishDate)}</span>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setEditing(n)}
+                    aria-label="Edit notice"
+                  >
+                    <Pencil />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setDeleteTarget(n)}
+                    aria-label="Delete notice"
+                  >
+                    <Trash2 />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <NoticeDialog
+        target={editing}
+        onClose={(saved) => {
+          setEditing(null);
+          if (saved) load();
+        }}
+      />
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete notice"
+          description={
+            <p>
+              Delete <strong>{deleteTarget.title}</strong>? This cannot be
+              undone.
+            </p>
+          }
+          confirmLabel="Delete"
+          variant="destructive"
+          loading={deleting}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </>
   );
-};
+}
 
-const NoticeForm = ({ notice, onClose }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    body: '',
-    audience: 'all',
-    expiryDate: '',
-    status: 'published'
+function NoticeDialog({ target, onClose }) {
+  const isNew = target === "new";
+  const [form, setForm] = useState({
+    title: "",
+    body: "",
+    audience: "all",
+    status: "published",
+    expiryDate: "",
   });
-  const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (notice) {
-      setFormData({ // eslint-disable-line react-hooks/set-state-in-effect
-        title: notice.title,
-        body: notice.body,
-        audience: notice.audience,
-        expiryDate: notice.expiryDate || '',
-        status: notice.status
+    if (!target) return;
+    setError("");
+    if (isNew) {
+      setForm({
+        title: "",
+        body: "",
+        audience: "all",
+        status: "published",
+        expiryDate: "",
+      });
+    } else {
+      setForm({
+        title: target.title,
+        body: target.body,
+        audience: target.audience,
+        status: target.status,
+        expiryDate: target.expiryDate || "",
       });
     }
-  }, [notice]);
+  }, [target, isNew]);
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  if (!target) return null;
 
-  const validate = () => {
-    const newErrors = {};
+  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
-    if (!formData.title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-
-    if (!formData.body.trim()) {
-      newErrors.body = 'Body is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validate()) {
+  const handleSave = async () => {
+    if (!form.title.trim() || !form.body.trim()) {
+      setError("Title and body are required");
       return;
     }
-
     try {
-      setSubmitting(true);
-
-      if (notice) {
-        await updateNotice(notice.id, formData);
-      } else {
-        await createNotice(formData);
-      }
-
+      setSaving(true);
+      if (isNew) await createNotice(form);
+      else await updateNotice(target.id, form);
       onClose(true);
     } catch (err) {
-      alert('Error saving notice: ' + err.message);
+      setError(err.message);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="dialog-overlay" onClick={() => onClose(false)}>
-      <div className="dialog-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h2 className="dialog-title">{notice ? 'Edit Notice' : 'Create Notice'}</h2>
-        </div>
-        <form onSubmit={handleSubmit}>
-          <div className="dialog-body">
-            <div className="form-group">
-              <label className="form-label">Title *</label>
-              <input
-                type="text"
-                className="form-input"
-                value={formData.title}
-                onChange={(e) => handleChange('title', e.target.value)}
-                placeholder="Notice title"
-              />
-              {errors.title && <div className="form-error">{errors.title}</div>}
-            </div>
+    <Dialog open={!!target} onOpenChange={(v) => !v && onClose(false)}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{isNew ? "New notice" : "Edit notice"}</DialogTitle>
+          <DialogDescription>
+            {isNew
+              ? "Compose an announcement for residents."
+              : "Update the contents of this notice."}
+          </DialogDescription>
+        </DialogHeader>
 
-            <div className="form-group">
-              <label className="form-label">Body *</label>
-              <textarea
-                className="form-textarea"
-                value={formData.body}
-                onChange={(e) => handleChange('body', e.target.value)}
-                placeholder="Notice content..."
-                rows="6"
-              />
-              {errors.body && <div className="form-error">{errors.body}</div>}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Audience *</label>
-              <select
-                className="form-select"
-                value={formData.audience}
-                onChange={(e) => handleChange('audience', e.target.value)}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Title</Label>
+            <Input
+              value={form.title}
+              onChange={(e) => update("title", e.target.value)}
+              placeholder="Semester fee deadline"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Body</Label>
+            <Textarea
+              value={form.body}
+              onChange={(e) => update("body", e.target.value)}
+              placeholder="Write the notice content..."
+              className="min-h-28"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Audience</Label>
+              <Select
+                value={form.audience}
+                onValueChange={(v) => update("audience", v)}
               >
-                <option value="all">All Students</option>
-                <option value="boys">Boys Hostel</option>
-                <option value="girls">Girls Hostel</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Everyone</SelectItem>
+                  <SelectItem value="boys">Boys' Hostel</SelectItem>
+                  <SelectItem value="girls">Girls' Hostel</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Expiry Date (Optional)</label>
-              <input
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) => update("status", v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Expiry date</Label>
+              <Input
                 type="date"
-                className="form-input"
-                value={formData.expiryDate}
-                onChange={(e) => handleChange('expiryDate', e.target.value)}
+                value={form.expiryDate || ""}
+                onChange={(e) => update("expiryDate", e.target.value)}
               />
             </div>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
 
-            <div className="form-group">
-              <label className="form-label">Status *</label>
-              <select
-                className="form-select"
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value)}
-              >
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-              </select>
-            </div>
-          </div>
-          <div className="dialog-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => onClose(false)} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : notice ? 'Update Notice' : 'Create Notice'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onClose(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : isNew ? "Publish" : "Save changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-};
-
-export default NoticesPage;
+}

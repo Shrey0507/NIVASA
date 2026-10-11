@@ -1,62 +1,58 @@
-/**
- * ConfirmDialog - reusable confirmation modal
- * Props:
- *   title: string
- *   description: ReactNode
- *   confirmLabel: string (default "Confirm")
- *   cancelLabel: string (default "Cancel")
- *   variant: 'destructive' | 'default'
- *   loading: boolean
- *   error: string
- *   onConfirm: () => void
- *   onCancel: () => void
- */
-const ConfirmDialog = ({
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+
+export default function ConfirmDialog({
+  open = true,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  variant = 'default',
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  variant = "default",
   loading = false,
-  error = '',
+  error,
   onConfirm,
   onCancel,
-}) => {
+}) {
   return (
-    <div className="dialog-overlay" onClick={!loading ? onCancel : undefined}>
-      <div className="dialog-content dialog-content-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h2 className="dialog-title">{title}</h2>
-        </div>
-        <div className="dialog-body">
-          <div style={{ fontSize: '0.875rem', color: 'hsl(var(--foreground))', lineHeight: '1.6' }}>
-            {description}
-          </div>
-          {error && (
-            <div className="form-error" style={{ marginTop: '1rem' }}>{error}</div>
-          )}
-        </div>
-        <div className="dialog-footer">
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onCancel}
-            disabled={loading}
-          >
+    <Dialog open={open} onOpenChange={(v) => !v && !loading && onCancel?.()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description ? (
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                {description}
+              </div>
+            </DialogDescription>
+          ) : null}
+        </DialogHeader>
+
+        {error ? (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel} disabled={loading}>
             {cancelLabel}
-          </button>
-          <button
-            type="button"
-            className={`btn ${variant === 'destructive' ? 'btn-destructive' : 'btn-primary'}`}
+          </Button>
+          <Button
+            variant={variant === "destructive" ? "destructive" : "default"}
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? 'Please wait...' : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+            {loading ? "Working..." : confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-};
-
-export default ConfirmDialog;
+}

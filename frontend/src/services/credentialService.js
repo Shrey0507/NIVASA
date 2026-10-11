@@ -36,7 +36,7 @@ const ensureSeed = async () => {
   }));
 };
 
-export const listCredentials = async (filters = {}) => {
+export const getCredentials = async (filters = {}) => {
   assertAdmin();
   await delay();
   await ensureSeed();
@@ -48,6 +48,7 @@ export const listCredentials = async (filters = {}) => {
       c.usn.toLowerCase().includes(q) ||
       c.username.toLowerCase().includes(q));
   }
+  if (filters.hostel) out = out.filter(c => c.hostelType === filters.hostel);
   if (filters.status) out = out.filter(c => c.status === filters.status);
   return out;
 };
@@ -61,14 +62,14 @@ export const getEligibleStudents = async () => {
   return students.filter(s => !taken.has(s.id));
 };
 
-export const createCredential = async (studentId, username) => {
+export const createCredential = async (data) => {
   assertAdmin();
   await delay(600);
   await ensureSeed();
-  const student = (await getStudents()).find(s => s.id === parseInt(studentId));
+  const student = (await getStudents()).find(s => s.id === parseInt(data.id));
   if (!student) throw new Error('Student not found');
   if (creds.some(c => c.studentId === student.id)) throw new Error('Student already has a credential');
-  const name = (username || student.usn).trim().toLowerCase();
+  const name = (data.username || student.usn).trim().toLowerCase();
   if (!/^[a-z0-9._-]{4,30}$/.test(name)) throw new Error('Username must be 4-30 chars (a-z, 0-9, . _ -)');
   if (creds.some(c => c.username === name)) throw new Error('Username already taken');
   const credential = {
@@ -84,7 +85,7 @@ export const createCredential = async (studentId, username) => {
     lastLogin: null
   };
   creds.push(credential);
-  return { credential, tempPassword: genPassword() };
+  return { ...credential, password: genPassword() };
 };
 
 export const resetPassword = async (id) => {
@@ -93,7 +94,7 @@ export const resetPassword = async (id) => {
   const c = creds.find(x => x.id === id);
   if (!c) throw new Error('Credential not found');
   c.mustChangePassword = true;
-  return { credential: c, tempPassword: genPassword() };
+  return { ...c, newPassword: genPassword() };
 };
 
 export const setCredentialStatus = async (id, status) => {

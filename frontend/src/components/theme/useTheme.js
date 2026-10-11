@@ -1,8 +1,9 @@
 import { createContext, useContext } from 'react';
 
 export const ThemeContext = createContext({
-  theme: 'light',
+  theme: 'system',
   setTheme: () => null,
+  resolvedTheme: 'light',
 });
 
 export const useTheme = () => {

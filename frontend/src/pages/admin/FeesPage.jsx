@@ -1,306 +1,478 @@
-import { useState, useEffect } from 'react';
-import AdminHeader from '../../components/layout/AdminHeader';
-import { getFeeRecords, updateFeeRecord } from '../../services/adminService';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { IndianRupee, Plus, Search } from "lucide-react";
 
-const FeesPage = () => {
-  const [fees, setFees] = useState([]);
+import {
+  createFeeRecord,
+  getFeeRecords,
+  updateFeeRecord,
+} from "@/services/adminService";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatCard } from "@/components/common/StatCard";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+const ALL = "all";
+const inr = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
+
+const formatDate = (iso) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
+export default function FeesPage() {
+  const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedFee, setSelectedFee] = useState(null);
-  const [filters, setFilters] = useState({
-    search: '',
-    status: '',
-    category: ''
-  });
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState(ALL);
+  const [category, setCategory] = useState(ALL);
+  const [paymentTarget, setPaymentTarget] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
 
-  const loadFees = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getFeeRecords(filters);
-      setFees(data);
+      const data = await getFeeRecords({
+        search,
+        status: status === ALL ? "" : status,
+        category: category === ALL ? "" : category,
+      });
+      setRecords(data);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading fees:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, status, category]);
 
   useEffect(() => {
-    loadFees(); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
+    load();
+  }, [load]);
 
-  const handleFilterChange = (field, value) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleUpdatePayment = (fee) => {
-    setSelectedFee(fee);
-    setShowForm(true);
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'paid':
-        return <span className="badge badge-paid">Paid</span>;
-      case 'partial':
-        return <span className="badge badge-warning">Partial</span>;
-      case 'pending':
-        return <span className="badge badge-pending">Pending</span>;
-      case 'overdue':
-        return <span className="badge badge-overdue">Overdue</span>;
-      default:
-        return <span className="badge badge-default">{status}</span>;
-    }
-  };
-
-  const calculateStats = () => {
-    const total = fees.reduce((sum, fee) => sum + fee.amount, 0);
-    const collected = fees.reduce((sum, fee) => sum + fee.paid, 0);
-    const outstanding = total - collected;
-    const overdueCount = fees.filter(f => f.status === 'overdue').length;
-
-    return { total, collected, outstanding, overdueCount };
-  };
-
-  const stats = calculateStats();
+  const totals = useMemo(() => {
+    return records.reduce(
+      (acc, r) => {
+        acc.billed += r.amount;
+        acc.paid += r.paid;
+        acc.balance += r.balance;
+        return acc;
+      },
+      { billed: 0, paid: 0, balance: 0 },
+    );
+  }, [records]);
 
   return (
     <>
-      <AdminHeader title="Fee Management" />
-      <div className="admin-content">
-        <div className="page-header">
-          <h1 className="page-title">Fee Management</h1>
-          <p className="page-subtitle">Track and manage hostel fee payments</p>
-        </div>
+      <PageHeader
+        title="Fees"
+        description="Track billed, collected and outstanding hostel fees."
+      >
+        <Button onClick={() => setShowAdd(true)}>
+          <Plus /> Add fee record
+        </Button>
+      </PageHeader>
 
-        {/* Stats Cards */}
-        <div className="stat-cards-grid">
-          <div className="stat-card">
-            <h3 className="stat-card-title">Total Fees</h3>
-            <p className="stat-card-value">₹{stats.total.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="stat-card">
-            <h3 className="stat-card-title">Collected</h3>
-            <p className="stat-card-value">₹{stats.collected.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="stat-card">
-            <h3 className="stat-card-title">Outstanding</h3>
-            <p className="stat-card-value">₹{stats.outstanding.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="stat-card">
-            <h3 className="stat-card-title">Overdue</h3>
-            <p className="stat-card-value">{stats.overdueCount}</p>
-          </div>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Total billed" value={inr(totals.billed)} icon={IndianRupee} />
+        <StatCard
+          label="Collected"
+          value={inr(totals.paid)}
+          accent="bg-success/10 text-success"
+        />
+        <StatCard
+          label="Outstanding"
+          value={inr(totals.balance)}
+          accent="bg-destructive/10 text-destructive"
+        />
+      </div>
 
-        {/* Filters */}
-        <div className="filters-bar">
-          <input
-            type="text"
-            className="form-input search-input"
-            placeholder="Search by student name or USN..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative flex-1 sm:min-w-[240px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by student or USN..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-          <select
-            className="form-select"
-            value={filters.status}
-            onChange={(e) => handleFilterChange('status', e.target.value)}
-          >
-            <option value="">All Status</option>
-            <option value="paid">Paid</option>
-            <option value="partial">Partial</option>
-            <option value="pending">Pending</option>
-            <option value="overdue">Overdue</option>
-          </select>
-          <select
-            className="form-select"
-            value={filters.category}
-            onChange={(e) => handleFilterChange('category', e.target.value)}
-          >
-            <option value="">All Categories</option>
-            <option value="Semester Fee">Semester Fee</option>
-            <option value="Hostel Fee">Hostel Fee</option>
-            <option value="Mess Fee">Mess Fee</option>
-          </select>
         </div>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="sm:w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All status</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+            <SelectItem value="partial">Partial</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="overdue">Overdue</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger className="sm:w-[180px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All categories</SelectItem>
+            <SelectItem value="Semester Fee">Semester Fee</SelectItem>
+            <SelectItem value="Hostel Fee">Hostel Fee</SelectItem>
+            <SelectItem value="Mess Fee">Mess Fee</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-        {/* Table */}
+      <div className="rounded-xl border bg-card">
         {loading ? (
-          <div className="loading">
-            <div className="spinner"></div>
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
           </div>
         ) : error ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">Error loading fees</p>
-                <p>{error}</p>
-                <button className="btn btn-primary" onClick={loadFees} style={{ marginTop: '1rem' }}>
+          <div className="p-6">
+            <EmptyState
+              title="Failed to load fee records"
+              description={error}
+              action={
+                <Button variant="outline" onClick={load}>
                   Retry
-                </button>
-              </div>
-            </div>
+                </Button>
+              }
+            />
           </div>
-        ) : fees.length === 0 ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">No fee records found</p>
-                <p>Try adjusting your filters.</p>
-              </div>
-            </div>
+        ) : records.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              icon={IndianRupee}
+              title="No fee records found"
+              description="Try adjusting your filters."
+            />
           </div>
         ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>USN</th>
-                  <th>Category</th>
-                  <th>Amount</th>
-                  <th>Paid</th>
-                  <th>Balance</th>
-                  <th>Due Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fees.map((fee) => (
-                  <tr key={fee.id}>
-                    <td>
-                      <div style={{ fontWeight: '500' }}>{fee.studentName}</div>
-                    </td>
-                    <td>{fee.usn}</td>
-                    <td>{fee.category}</td>
-                    <td>₹{fee.amount.toLocaleString('en-IN')}</td>
-                    <td>₹{fee.paid.toLocaleString('en-IN')}</td>
-                    <td>₹{fee.balance.toLocaleString('en-IN')}</td>
-                    <td>{new Date(fee.dueDate).toLocaleDateString('en-IN')}</td>
-                    <td>{getStatusBadge(fee.status)}</td>
-                    <td>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => handleUpdatePayment(fee)}
-                      >
-                        Update
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Student</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
+                <TableHead>Due date</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {records.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell>
+                    <div className="font-medium">{r.studentName}</div>
+                    <div className="font-mono text-xs text-muted-foreground">
+                      {r.usn}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>{r.category}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.term}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {inr(r.amount)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-success">
+                    {inr(r.paid)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {inr(r.balance)}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(r.dueDate)}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={r.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={r.balance <= 0}
+                      onClick={() => setPaymentTarget(r)}
+                    >
+                      {r.balance <= 0 ? "Settled" : "Record payment"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
-      {/* Payment Update Dialog */}
-      {showForm && selectedFee && (
-        <PaymentUpdateDialog
-          fee={selectedFee}
-          onClose={(updated) => {
-            setShowForm(false);
-            setSelectedFee(null);
-            if (updated) loadFees();
-          }}
-        />
-      )}
+      <PaymentDialog
+        record={paymentTarget}
+        onClose={(saved) => {
+          setPaymentTarget(null);
+          if (saved) load();
+        }}
+      />
+
+      <AddFeeDialog
+        open={showAdd}
+        onClose={(saved) => {
+          setShowAdd(false);
+          if (saved) load();
+        }}
+      />
     </>
   );
-};
+}
 
-const PaymentUpdateDialog = ({ fee, onClose }) => {
-  const [paidAmount, setPaidAmount] = useState(fee.paid);
-  const [receiptNumber, setReceiptNumber] = useState(fee.receiptNumber || '');
-  const [submitting, setSubmitting] = useState(false);
+function PaymentDialog({ record, onClose }) {
+  const [amount, setAmount] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (record) {
+      setAmount("");
+      setError("");
+    }
+  }, [record]);
 
-    if (paidAmount < 0 || paidAmount > fee.amount) {
-      alert('Invalid payment amount');
+  if (!record) return null;
+
+  const handleSave = async () => {
+    const value = Number(amount);
+    if (!value || value <= 0) {
+      setError("Enter a valid amount");
       return;
     }
-
+    if (value > record.balance) {
+      setError(`Cannot exceed the balance of ${inr(record.balance)}`);
+      return;
+    }
     try {
-      setSubmitting(true);
-      await updateFeeRecord(fee.id, {
-        ...fee,
-        paid: parseFloat(paidAmount),
-        receiptNumber: receiptNumber || null,
-        paidDate: paidAmount > 0 ? new Date().toISOString().split('T')[0] : null
+      setSaving(true);
+      await updateFeeRecord(record.id, {
+        ...record,
+        paid: record.paid + value,
       });
       onClose(true);
     } catch (err) {
-      alert('Error updating payment: ' + err.message);
+      setError(err.message);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="dialog-overlay" onClick={() => onClose(false)}>
-      <div className="dialog-content" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h2 className="dialog-title">Update Payment</h2>
+    <Dialog open={!!record} onOpenChange={(v) => !v && onClose(false)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record payment</DialogTitle>
+          <DialogDescription>
+            {record.studentName} · {record.category} ({record.term})
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex justify-between rounded-lg border p-3 text-sm">
+            <span className="text-muted-foreground">Outstanding balance</span>
+            <span className="font-semibold">{inr(record.balance)}</span>
+          </div>
+          <div className="space-y-2">
+            <Label>Amount received</Label>
+            <Input
+              type="number"
+              min="1"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+            />
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="dialog-body">
-            <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'hsl(var(--muted))', borderRadius: 'var(--radius)' }}>
-              <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{fee.studentName}</div>
-              <div style={{ fontSize: '0.875rem', color: 'hsl(var(--muted-foreground))' }}>
-                {fee.usn} • {fee.category}
-              </div>
-              <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                Total Amount: ₹{fee.amount.toLocaleString('en-IN')}
-              </div>
-            </div>
 
-            <div className="form-group">
-              <label className="form-label">Paid Amount (₹)</label>
-              <input
-                type="number"
-                className="form-input"
-                value={paidAmount}
-                onChange={(e) => setPaidAmount(e.target.value)}
-                min="0"
-                max={fee.amount}
-                step="0.01"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Receipt Number</label>
-              <input
-                type="text"
-                className="form-input"
-                value={receiptNumber}
-                onChange={(e) => setReceiptNumber(e.target.value)}
-                placeholder="Optional"
-              />
-            </div>
-
-            <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'hsl(var(--muted))', borderRadius: 'var(--radius)', fontSize: '0.875rem' }}>
-              Balance: ₹{(fee.amount - paidAmount).toLocaleString('en-IN')}
-            </div>
-          </div>
-          <div className="dialog-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => onClose(false)} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : 'Update Payment'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onClose(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Record payment"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-};
+}
 
-export default FeesPage;
+function AddFeeDialog({ open, onClose }) {
+  const [form, setForm] = useState({
+    studentName: "",
+    usn: "",
+    category: "Semester Fee",
+    term: "",
+    amount: "",
+    dueDate: "",
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm({
+        studentName: "",
+        usn: "",
+        category: "Semester Fee",
+        term: "",
+        amount: "",
+        dueDate: "",
+      });
+      setError("");
+    }
+  }, [open]);
+
+  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.studentName.trim() || !form.usn.trim()) {
+      setError("Student name and USN are required");
+      return;
+    }
+    const amount = Number(form.amount);
+    if (!amount || amount <= 0) {
+      setError("Enter a valid amount");
+      return;
+    }
+    try {
+      setSaving(true);
+      await createFeeRecord({
+        ...form,
+        amount,
+        studentId: Date.now(),
+        paid: 0,
+        dueDate: form.dueDate || new Date().toISOString().split("T")[0],
+      });
+      onClose(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose(false)}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add fee record</DialogTitle>
+          <DialogDescription>
+            Create a new billed fee entry for a resident.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Student name</Label>
+            <Input
+              value={form.studentName}
+              onChange={(e) => update("studentName", e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>USN</Label>
+            <Input
+              value={form.usn}
+              onChange={(e) => update("usn", e.target.value.toUpperCase())}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select
+              value={form.category}
+              onValueChange={(v) => update("category", v)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Semester Fee">Semester Fee</SelectItem>
+                <SelectItem value="Hostel Fee">Hostel Fee</SelectItem>
+                <SelectItem value="Mess Fee">Mess Fee</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Term</Label>
+            <Input
+              value={form.term}
+              onChange={(e) => update("term", e.target.value)}
+              placeholder="Semester 5"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Amount</Label>
+            <Input
+              type="number"
+              value={form.amount}
+              onChange={(e) => update("amount", e.target.value)}
+              placeholder="45000"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Due date</Label>
+            <Input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => update("dueDate", e.target.value)}
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onClose(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Add record"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

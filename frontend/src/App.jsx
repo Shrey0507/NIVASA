@@ -1,22 +1,42 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from './components/theme/ThemeProvider';
-import AdminLayout from './components/layout/AdminLayout';
-import DashboardPage from './pages/admin/DashboardPage';
-import StudentsPage from './pages/admin/StudentsPage';
-import RoomsPage from './pages/admin/RoomsPage';
-import FeesPage from './pages/admin/FeesPage';
-import MessPage from './pages/admin/MessPage';
-import MovementsPage from './pages/admin/MovementsPage';
-import GrievancesPage from './pages/admin/GrievancesPage';
-import NoticesPage from './pages/admin/NoticesPage';
-import CredentialsPage from './pages/admin/CredentialsPage';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ThemeProvider } from "./components/theme/ThemeProvider";
+
+// Auth
+import AdminLoginPage from "./pages/auth/AdminLoginPage";
+import StudentLoginPage from "./pages/auth/StudentLoginPage";
+
+// Admin
+import AdminLayout from "./components/layout/AdminLayout";
+import DashboardPage from "./pages/admin/DashboardPage";
+import StudentsPage from "./pages/admin/StudentsPage";
+import RoomsPage from "./pages/admin/RoomsPage";
+import FeesPage from "./pages/admin/FeesPage";
+import MessPage from "./pages/admin/MessPage";
+import MovementsPage from "./pages/admin/MovementsPage";
+import GrievancesPage from "./pages/admin/GrievancesPage";
+import NoticesPage from "./pages/admin/NoticesPage";
+import CredentialsPage from "./pages/admin/CredentialsPage";
+
+// Student
+import StudentLayout from "./components/layout/StudentLayout";
+import StudentDashboardPage from "./pages/student/StudentDashboardPage";
+import StudentProfilePage from "./pages/student/StudentProfilePage";
+import StudentFeesPage from "./pages/student/StudentFeesPage";
+import StudentMessPage from "./pages/student/StudentMessPage";
+import StudentMovementsPage from "./pages/student/StudentMovementsPage";
+import StudentGrievancesPage from "./pages/student/StudentGrievancesPage";
+import StudentNoticesPage from "./pages/student/StudentNoticesPage";
 
 function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/admin" replace />} />
+          <Route path="/" element={<Navigate to="/admin/login" replace />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          <Route path="/student/login" element={<StudentLoginPage />} />
+
+          {/* Admin routes */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="students" element={<StudentsPage />} />
@@ -28,7 +48,19 @@ function App() {
             <Route path="notices" element={<NoticesPage />} />
             <Route path="credentials" element={<CredentialsPage />} />
           </Route>
-          <Route path="*" element={<Navigate to="/admin" replace />} />
+
+          {/* Student routes */}
+          <Route path="/student" element={<StudentLayout />}>
+            <Route index element={<StudentDashboardPage />} />
+            <Route path="profile" element={<StudentProfilePage />} />
+            <Route path="fees" element={<StudentFeesPage />} />
+            <Route path="mess" element={<StudentMessPage />} />
+            <Route path="movements" element={<StudentMovementsPage />} />
+            <Route path="grievances" element={<StudentGrievancesPage />} />
+            <Route path="notices" element={<StudentNoticesPage />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/admin/login" replace />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

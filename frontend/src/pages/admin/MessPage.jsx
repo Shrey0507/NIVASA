@@ -1,306 +1,299 @@
-import { useState, useEffect } from 'react';
-import AdminHeader from '../../components/layout/AdminHeader';
-import { getMessMenu, createMessMenu, updateMessMenu, deleteMessMenu } from '../../services/adminService';
+import { useCallback, useEffect, useState } from "react";
+import { Pencil, Plus, UtensilsCrossed } from "lucide-react";
 
-const MessPage = () => {
-  const [menus, setMenus] = useState([]);
+import {
+  createMessMenu,
+  getMessMenu,
+  updateMessMenu,
+} from "@/services/adminService";
+import { PageHeader } from "@/components/common/PageHeader";
+import { EmptyState } from "@/components/common/EmptyState";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const MEALS = [
+  { key: "breakfast", label: "Breakfast" },
+  { key: "lunch", label: "Lunch" },
+  { key: "snacks", label: "Snacks" },
+  { key: "dinner", label: "Dinner" },
+];
+
+const formatDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+  });
+
+export default function MessPage() {
+  const [menu, setMenu] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedMenu, setSelectedMenu] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [editing, setEditing] = useState(null);
 
-  const loadMenus = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await getMessMenu();
-      setMenus(data);
+      setMenu(data);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading mess menu:', err);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadMenus(); // eslint-disable-line react-hooks/set-state-in-effect
   }, []);
 
-  const handleAddMenu = () => {
-    setSelectedMenu(null);
-    setShowForm(true);
-  };
-
-  const handleEditMenu = (menu) => {
-    setSelectedMenu(menu);
-    setShowForm(true);
-  };
-
-  const handleDeleteMenu = async (menu) => {
-    if (!window.confirm(`Delete menu for ${menu.date}?`)) {
-      return;
-    }
-
-    try {
-      await deleteMessMenu(menu.id);
-      await loadMenus();
-    } catch (err) {
-      alert('Error deleting menu: ' + err.message);
-    }
-  };
-
-  const handleFormClose = (updated) => {
-    setShowForm(false);
-    setSelectedMenu(null);
-    if (updated) {
-      loadMenus();
-    }
-  };
-
-  const filteredMenus = menus.filter(m => !selectedDate || m.date === selectedDate);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   return (
     <>
-      <AdminHeader title="Mess Management" />
-      <div className="admin-content">
-        <div className="actions-bar">
-          <h1 className="page-title">Mess Management</h1>
-          <button className="btn btn-primary" onClick={handleAddMenu}>
-            + Add Menu
-          </button>
-        </div>
+      <PageHeader
+        title="Mess"
+        description="Publish and manage the daily mess menu for residents."
+      >
+        <Button onClick={() => setEditing("new")}>
+          <Plus /> Add menu day
+        </Button>
+      </PageHeader>
 
-        <div className="filters-bar">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Select Date</label>
-            <input
-              type="date"
-              className="form-input"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
-          </div>
+      {loading ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Skeleton key={i} className="h-72 w-full rounded-xl" />
+          ))}
         </div>
-
-        {loading ? (
-          <div className="loading">
-            <div className="spinner"></div>
-          </div>
-        ) : error ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">Error loading menu</p>
-                <p>{error}</p>
-                <button className="btn btn-primary" onClick={loadMenus} style={{ marginTop: '1rem' }}>
-                  Retry
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : filteredMenus.length === 0 ? (
-          <div className="card">
-            <div className="card-content">
-              <div className="empty-state">
-                <p className="empty-state-title">No menu for this date</p>
-                <p>Add a menu to get started.</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          filteredMenus.map((menu) => (
-            <div key={menu.id} className="card" style={{ marginBottom: '1.5rem' }}>
-              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      ) : error ? (
+        <EmptyState
+          title="Failed to load the mess menu"
+          description={error}
+          action={
+            <Button variant="outline" onClick={load}>
+              Retry
+            </Button>
+          }
+        />
+      ) : menu.length === 0 ? (
+        <EmptyState
+          icon={UtensilsCrossed}
+          title="No menu published"
+          description="Add the first day of the mess menu to get started."
+          action={
+            <Button onClick={() => setEditing("new")}>
+              <Plus /> Add menu day
+            </Button>
+          }
+        />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {menu.map((day) => (
+            <div key={day.id} className="rounded-xl border bg-card p-5">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="card-title">{menu.day}, {new Date(menu.date).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}</h3>
+                  <p className="font-semibold">{day.day}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatDate(day.date)}
+                  </p>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleEditMenu(menu)}>
-                    Edit
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteMenu(menu)} style={{ color: 'hsl(var(--destructive))' }}>
-                    Delete
-                  </button>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditing(day)}
+                >
+                  <Pencil /> Edit
+                </Button>
               </div>
-              <div className="card-content">
-                <div className="grid grid-cols-2">
-                  <MealCard title="Breakfast" meal={menu.breakfast} />
-                  <MealCard title="Lunch" meal={menu.lunch} />
-                  <MealCard title="Snacks" meal={menu.snacks} />
-                  <MealCard title="Dinner" meal={menu.dinner} />
-                </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {MEALS.map((meal) => {
+                  const section = day[meal.key];
+                  if (!section) return null;
+                  return (
+                    <div key={meal.key} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">{meal.label}</p>
+                        <span className="text-[11px] text-muted-foreground">
+                          {section.time}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {section.items.join(" · ")}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          ))
-        )}
-      </div>
-
-      {showForm && (
-        <MenuForm menu={selectedMenu} onClose={handleFormClose} />
+          ))}
+        </div>
       )}
+
+      <MenuDialog
+        target={editing}
+        onClose={(saved) => {
+          setEditing(null);
+          if (saved) load();
+        }}
+      />
     </>
   );
-};
+}
 
-const MealCard = ({ title, meal }) => (
-  <div style={{ padding: '1rem', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}>
-    <h4 style={{ fontSize: '0.9375rem', fontWeight: '600', marginBottom: '0.5rem' }}>{title}</h4>
-    <div style={{ fontSize: '0.8125rem', color: 'hsl(var(--muted-foreground))', marginBottom: '0.5rem' }}>
-      {meal.time}
-    </div>
-    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.875rem' }}>
-      {meal.items.map((item, idx) => (
-        <li key={idx}>{item}</li>
-      ))}
-    </ul>
-  </div>
-);
+function emptyForm() {
+  return {
+    day: "",
+    date: new Date().toISOString().split("T")[0],
+    breakfast: { items: "", time: "7:00 AM - 9:00 AM" },
+    lunch: { items: "", time: "12:00 PM - 2:00 PM" },
+    snacks: { items: "", time: "4:00 PM - 5:00 PM" },
+    dinner: { items: "", time: "7:00 PM - 9:00 PM" },
+  };
+}
 
-const MenuForm = ({ menu, onClose }) => {
-  const [formData, setFormData] = useState({
-    date: '',
-    day: '',
-    breakfast: { items: [''], time: '7:00 AM - 9:00 AM' },
-    lunch: { items: [''], time: '12:00 PM - 2:00 PM' },
-    snacks: { items: [''], time: '4:00 PM - 5:00 PM' },
-    dinner: { items: [''], time: '7:00 PM - 9:00 PM' }
-  });
-  const [submitting, setSubmitting] = useState(false);
+function MenuDialog({ target, onClose }) {
+  const isNew = target === "new";
+  const [form, setForm] = useState(emptyForm());
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (menu) {
-      setFormData({ // eslint-disable-line react-hooks/set-state-in-effect
-        date: menu.date,
-        day: menu.day,
-        breakfast: menu.breakfast,
-        lunch: menu.lunch,
-        snacks: menu.snacks,
-        dinner: menu.dinner
-      });
+    if (!target) return;
+    setError("");
+    if (isNew) {
+      setForm(emptyForm());
     } else {
-      setFormData(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
+      const toForm = (section) => ({
+        items: (section?.items || []).join(", "),
+        time: section?.time || "",
+      });
+      setForm({
+        day: target.day,
+        date: target.date,
+        breakfast: toForm(target.breakfast),
+        lunch: toForm(target.lunch),
+        snacks: toForm(target.snacks),
+        dinner: toForm(target.dinner),
+      });
     }
-  }, [menu]);
+  }, [target, isNew]);
 
-  const updateMealItems = (meal, items) => {
-    setFormData(prev => ({
-      ...prev,
-      [meal]: { ...prev[meal], items: items.filter(i => i.trim()) }
-    }));
-  };
+  if (!target) return null;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const updateMeal = (meal, field, value) =>
+    setForm((p) => ({ ...p, [meal]: { ...p[meal], [field]: value } }));
 
-    if (!formData.date || !formData.day) {
-      alert('Please fill in date and day');
+  const handleSave = async () => {
+    if (!form.day.trim()) {
+      setError("A day label is required");
       return;
     }
-
+    const payload = {
+      day: form.day,
+      date: form.date,
+      breakfast: {
+        items: splitItems(form.breakfast.items),
+        time: form.breakfast.time,
+      },
+      lunch: { items: splitItems(form.lunch.items), time: form.lunch.time },
+      snacks: { items: splitItems(form.snacks.items), time: form.snacks.time },
+      dinner: { items: splitItems(form.dinner.items), time: form.dinner.time },
+    };
     try {
-      setSubmitting(true);
-
-      if (menu) {
-        await updateMessMenu(menu.id, formData);
-      } else {
-        await createMessMenu(formData);
-      }
-
+      setSaving(true);
+      if (isNew) await createMessMenu(payload);
+      else await updateMessMenu(target.id, payload);
       onClose(true);
     } catch (err) {
-      alert('Error saving menu: ' + err.message);
+      setError(err.message);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="dialog-overlay" onClick={() => onClose(false)}>
-      <div className="dialog-content" style={{ maxWidth: '800px' }} onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h2 className="dialog-title">{menu ? 'Edit Menu' : 'Add Menu'}</h2>
+    <Dialog open={!!target} onOpenChange={(v) => !v && onClose(false)}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{isNew ? "Add menu day" : "Edit menu"}</DialogTitle>
+          <DialogDescription>
+            Set the meals and timings for this day.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Day label</Label>
+              <Input
+                value={form.day}
+                onChange={(e) => setForm((p) => ({ ...p, day: e.target.value }))}
+                placeholder="Monday"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={form.date}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, date: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          {MEALS.map((meal) => (
+            <div key={meal.key} className="space-y-2 rounded-lg border p-3">
+              <p className="text-sm font-medium">{meal.label}</p>
+              <div className="grid gap-3 sm:grid-cols-[1fr_180px]">
+                <Input
+                  value={form[meal.key].items}
+                  onChange={(e) =>
+                    updateMeal(meal.key, "items", e.target.value)
+                  }
+                  placeholder="Comma-separated items"
+                />
+                <Input
+                  value={form[meal.key].time}
+                  onChange={(e) => updateMeal(meal.key, "time", e.target.value)}
+                  placeholder="Timing"
+                />
+              </div>
+            </div>
+          ))}
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
-        <form onSubmit={handleSubmit}>
-          <div className="dialog-body">
-            <div className="grid grid-cols-2">
-              <div className="form-group">
-                <label className="form-label">Date *</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={formData.date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Day *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.day}
-                  onChange={(e) => setFormData(prev => ({ ...prev, day: e.target.value }))}
-                  placeholder="Monday"
-                  required
-                />
-              </div>
-            </div>
 
-            <div className="form-group">
-              <label className="form-label">Breakfast Items (comma separated)</label>
-              <textarea
-                className="form-textarea"
-                value={formData.breakfast.items.join(', ')}
-                onChange={(e) => updateMealItems('breakfast', e.target.value.split(','))}
-                rows="2"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Lunch Items (comma separated)</label>
-              <textarea
-                className="form-textarea"
-                value={formData.lunch.items.join(', ')}
-                onChange={(e) => updateMealItems('lunch', e.target.value.split(','))}
-                rows="2"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Snacks Items (comma separated)</label>
-              <textarea
-                className="form-textarea"
-                value={formData.snacks.items.join(', ')}
-                onChange={(e) => updateMealItems('snacks', e.target.value.split(','))}
-                rows="2"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Dinner Items (comma separated)</label>
-              <textarea
-                className="form-textarea"
-                value={formData.dinner.items.join(', ')}
-                onChange={(e) => updateMealItems('dinner', e.target.value.split(','))}
-                rows="2"
-              />
-            </div>
-          </div>
-          <div className="dialog-footer">
-            <button type="button" className="btn btn-secondary" onClick={() => onClose(false)} disabled={submitting}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Saving...' : menu ? 'Update Menu' : 'Add Menu'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onClose(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : isNew ? "Add menu" : "Save changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
-};
+}
 
-export default MessPage;
+function splitItems(value) {
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
