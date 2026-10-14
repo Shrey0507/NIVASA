@@ -1,70 +1,64 @@
-﻿# NIVASA Backend & Supabase Setup
+# NIVASA Backend
 
-Express.js REST API and Supabase PostgreSQL integration for the NIVASA Smart Hostel Management System.
+Secure Express REST API for the existing NIVASA Supabase project.
 
-## 🚀 Quick Start Commands
+## Run locally
 
-### 1. Install Dependencies
-`ash
+```powershell
 cd backend
-npm install
-`
+Copy-Item .env.example .env
+# Fill SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+npm.cmd install
+npm.cmd test
+npm.cmd start
+```
 
-### 2. Configure Environment Variables
-Copy .env.example to .env if not already done:
-`ash
-cp .env.example .env
-`
-Open .env and fill in your Supabase credentials:
-- SUPABASE_URL: Project URL from Supabase Settings -> API
-- SUPABASE_ANON_KEY: Project Anon/Public Key from Supabase Settings -> API
-- SUPABASE_SERVICE_ROLE_KEY: Service Role Secret (for backend administration)
+The API listens on `http://localhost:5000` by default. Public checks are `GET /api/health/live`, `GET /api/health/ready`, and `GET /api/health`.
 
-### 3. Initialize Database Schema
-1. Open your [Supabase Dashboard](https://supabase.com/dashboard)
-2. Go to **SQL Editor** -> **New query**
-3. Copy the entire contents of ackend/supabase/schema.sql and click **Run**
-4. This creates all 7 tables (students, ooms, ees, movements, grievances, 
-otices, mess_menu), indexes, triggers, and Row Level Security.
+## Configuration
 
-### 4. Test Supabase Connection
-`ash
-npm run test:db
-`
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only. Never put it in the frontend or commit `.env`.
+- `CLIENT_URL` accepts a comma-separated allowlist of frontend origins.
+- Every protected endpoint requires `Authorization: Bearer <Supabase access token>`.
+- The server verifies the token with Supabase Auth, then loads `user_profiles`; the client cannot grant itself admin access.
+- Expected profile roles are `student`, `admin`, `super_admin`, or `warden`. Students must have a linked `student_id`.
 
-### 5. Start Development Server
-`ash
-npm run dev
-`
-Server runs at: http://localhost:5000  
-Health check: http://localhost:5000/api/health
+## API groups
 
----
+- `/api/auth/me`
+- `/api/students`
+- `/api/hostels`, `/api/blocks`, `/api/rooms`
+- `/api/allocations`
+- `/api/fees`
+- `/api/movements`
+- `/api/grievances`
+- `/api/notices`
+- `/api/mess`
+- `/api/dashboard`
 
-## 📡 API Endpoints
+List responses use `{ data, pagination: { page, limit, total, totalPages } }`. Errors use `{ error: { code, message, details? } }`. Students can only list their own fees, movements, and grievances; admin roles manage the complete collections.
 
-- **Health Check**: GET /api/health
-- **Students**:
-  - GET /api/students?page=1&limit=20&search=...&hostel=boys
-  - GET /api/students/:id
-  - POST /api/students
-  - PUT /api/students/:id
-  - DELETE /api/students/:id
-- **Rooms**:
-  - GET /api/rooms?hostel=boys&status=available
-  - POST /api/rooms
-  - POST /api/rooms/:id/allocate
-- **Fees**:
-  - GET /api/fees?status=pending
-  - POST /api/fees/:id/pay
-- **Movements**:
-  - GET /api/movements?status=out
-  - POST /api/movements
-  - POST /api/movements/:id/return
-- **Grievances**:
-  - GET /api/grievances?status=open
-  - POST /api/grievances
-  - PUT /api/grievances/:id
-- **Notices**:
-  - GET /api/notices
-  - POST /api/notices
+## Existing-schema safety
+
+`supabase/schema.sql` is a legacy reference and is not safe to execute against the existing project: it uses `fees`/`mess_menu`, while the project instructions identify `fee_records`/`mess_menus` and additional hierarchy tables. Do not run it.
+
+Run the read-only checker after network access is available:
+
+```powershell
+npm.cmd run check:schema
+```
+
+The only supplied migration is `supabase/migrations/20261014_atomic_room_allocations.sql`. Review its column names against the live `room_allocations` table before applying it. The API refuses allocation/vacation with `MIGRATION_REQUIRED` until the RPC functions exist; it never performs an unsafe read-then-write fallback.
+
+## Frontend integration
+
+Create a frontend API client using `supabase.auth.getSession()` and send the session access token as a Bearer token to `VITE_API_URL` (for example `http://localhost:5000/api`). Replace mock service calls in `src/services/*` incrementally; keep the existing UI field mapping in one adapter module.
+
+## Render deployment
+
+- Build command: `npm ci`
+- Start command: `npm start`
+- Root directory: `backend`
+- Set `NODE_ENV=production`, `CLIENT_URL` to the deployed frontend origin, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in Render environment variables.
+- Do not expose the service-role key in Vite variables.
+- Verify `/api/health/ready` and `/api/health` after deployment.

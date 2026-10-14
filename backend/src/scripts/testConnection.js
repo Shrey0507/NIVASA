@@ -1,33 +1,11 @@
-import { supabase, isSupabaseConfigured } from "../config/supabase.js";
+import { supabaseAdmin, isSupabaseConfigured } from "../config/supabase.js";
 
-async function testConnection() {
-  console.log("==========================================");
-  console.log("   NIVASA - Supabase Connection Tester    ");
-  console.log("==========================================\n");
-
-  if (!isSupabaseConfigured()) {
-    console.warn("⚠️  Supabase is not configured yet with valid credentials.");
-    console.log("👉 Please update SUPABASE_URL and SUPABASE_ANON_KEY in backend/.env\n");
-    return;
-  }
-
-  console.log("⏳ Testing connection to Supabase...");
-  const tables = ["students", "rooms", "fees", "movements", "grievances", "notices", "mess_menu"];
-
+const tables = ["user_profiles", "students", "hostels", "blocks", "rooms", "room_allocations", "fee_records", "movements", "grievances", "notices", "mess_menus"];
+console.log("NIVASA Supabase compatibility check\n");
+if (!isSupabaseConfigured() || !supabaseAdmin) { console.log("Supabase is not configured."); process.exitCode = 2; }
+else {
   for (const table of tables) {
-    try {
-      const { error } = await supabase.from(table).select("count", { count: "exact", head: true });
-      if (error) {
-        console.log(`⚠️  Table "${table}": ${error.message}`);
-      } else {
-        console.log(`✅ Table "${table}": Accessible.`);
-      }
-    } catch (err) {
-      console.log(`❌ Table "${table}": ${err.message}`);
-    }
+    try { const { error } = await supabaseAdmin.from(table).select("id", { count: "exact", head: true }); console.log(error ? `WARN ${table}: ${error.message}` : `OK   ${table}`); }
+    catch (error) { console.log(`FAIL ${table}: ${error.message}`); }
   }
-
-  console.log("\n✨ Connection test finished.");
 }
-
-testConnection();
