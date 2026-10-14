@@ -5,7 +5,7 @@ import { AppError } from "../middleware/errors.js";
 import { dbRequired, throwDb, pageResult, cleanPatch } from "../utils/db.js";
 
 const router = Router();
-const admin = [authenticate, requireRole("admin", "super_admin", "warden")];
+const admin = [authenticate, requireRole("admin", "super_admin", "hostel_admin", "warden")];
 const staffOrStudent = [authenticate];
 const tables = { fees: "fee_records", mess: "mess_menus" };
 const send = (res, data, status = 200) => res.status(status).json(data);
@@ -41,7 +41,7 @@ for (const [path, table] of [["hostels", "hostels"], ["blocks", "blocks"], ["roo
 router.post("/allocations", ...admin, body(["student_id", "room_id"]), async (req, res, next) => { try { const { data, error } = await dbRequired().rpc("allocate_room", { p_student_id: req.body.student_id, p_room_id: req.body.room_id }); if (error) { if (error.code === "42883") throw new AppError(501, "Atomic allocation function is not installed; apply the additive migration first", "MIGRATION_REQUIRED"); throwDb(error); } send(res, data, 201); } catch (e) { next(e); } });
 router.delete("/allocations/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().rpc("vacate_room", { p_allocation_id: asId(req.params.id) }); if (error) { if (error.code === "42883") throw new AppError(501, "Atomic vacation function is not installed; apply the additive migration first", "MIGRATION_REQUIRED"); throwDb(error); } send(res, data); } catch (e) { next(e); } });
 
-const listOwned = (path, table, roles = ["admin", "super_admin", "warden", "student"]) => {
+const listOwned = (path, table, roles = ["admin", "super_admin", "hostel_admin", "warden", "student"]) => {
   router.get(path, authenticate, requireRole(...roles), pagination, async (req, res, next) => { try { send(res, await queryList(table, req, (q) => { q = ownerFilter(req, q); if (req.query.status) q = q.eq("status", req.query.status); return q.order("created_at", { ascending: false }); })); } catch (e) { next(e); } });
 };
 listOwned("/fees", tables.fees); listOwned("/movements", "movements"); listOwned("/grievances", "grievances");

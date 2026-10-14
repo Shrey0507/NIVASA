@@ -24,4 +24,6 @@ function invoke(method, url, headers = {}) {
 
 test("liveness endpoint is public", async () => { const response = await invoke("GET", "/api/health/live"); assert.equal(response.statusCode, 200); assert.equal(response.body.status, "ok"); });
 test("protected endpoint returns consistent 401", async () => { const response = await invoke("GET", "/api/dashboard"); assert.equal(response.statusCode, 401); assert.equal(response.body.error.code, "AUTH_REQUIRED"); });
+test("public signup is not exposed", async () => { const response = await invoke("POST", "/api/auth/signup"); assert.equal(response.statusCode, 404); assert.equal(response.body.error.code, "NOT_FOUND"); });
+test("account provisioning requires an authenticated administrator", async () => { const response = await invoke("POST", "/api/accounts/students"); assert.equal(response.statusCode, 401); assert.equal(response.body.error.code, "AUTH_REQUIRED"); });
 test("unknown route returns structured 404", async () => { const response = await invoke("GET", "/api/not-a-route"); assert.equal(response.statusCode, 404); assert.equal(response.body.error.code, "NOT_FOUND"); });

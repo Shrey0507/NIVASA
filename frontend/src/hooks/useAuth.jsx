@@ -18,8 +18,10 @@ export function AuthProvider({ children }) {
       const me = await apiRequest("/auth/me");
       const profile = me.profile || {};
       const isStudent = me.role === "student";
+      const profileHostel = profile.hostel || profile.hostel_type || profile.hostel_category;
+      const accessRole = isStudent ? "student" : (["hostel_admin", "warden"].includes(me.role) ? (profileHostel === "girls" ? "girls" : "boys") : "super");
       const student = isStudent ? (me.student || profile.student || profile.student_record || profile) : null;
-      setAuth({ isAuthenticated: true, loading: false, role: isStudent ? "student" : "super", hostel: profile.hostel || null, user: profile.full_name || session.user.email, profile, student });
+      setAuth({ isAuthenticated: true, loading: false, role: accessRole, hostel: profileHostel || null, user: profile.full_name || session.user.email, profile, student });
     } catch { await supabase.auth.signOut(); setAuth({ ...INITIAL, loading: false }); }
   }, []);
   useEffect(() => { supabase.auth.getSession().then(({ data: { session } }) => loadSession(session)); const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => loadSession(session)); return () => subscription.unsubscribe(); }, [loadSession]);

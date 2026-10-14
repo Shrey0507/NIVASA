@@ -2,8 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./components/theme/ThemeProvider";
 
 // Auth
-import AdminLoginPage from "./pages/auth/AdminLoginPage";
-import StudentLoginPage from "./pages/auth/StudentLoginPage";
+import LoginPage from "./pages/auth/LoginPage";
 
 // Admin
 import AdminLayout from "./components/layout/AdminLayout";
@@ -32,9 +31,10 @@ function App() {
     <ThemeProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/admin/login" replace />} />
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/student/login" element={<StudentLoginPage />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+          <Route path="/student/login" element={<Navigate to="/login" replace />} />
 
           {/* Admin routes */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -60,7 +60,7 @@ function App() {
             <Route path="notices" element={<StudentNoticesPage />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/admin/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
