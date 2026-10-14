@@ -1,0 +1,23 @@
+{
+  "name": "nivasa-backend",
+  "version": "1.0.0",
+  "description": "NIVASA Smart Hostel Management System - Express & Supabase Backend",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "dev:watch": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test:db": "node src/scripts/testConnection.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
