@@ -13,7 +13,9 @@ export async function authenticate(req, res, next) {
     const { data: profile, error: profileError } = await supabaseAdmin.from("user_profiles").select("*").eq("id", data.user.id).maybeSingle();
     if (profileError) throw new AppError(503, "Unable to load authorization profile", "AUTH_PROFILE_UNAVAILABLE");
     req.user = { id: data.user.id, email: data.user.email, profile: profile || null, token };
-    req.role = profile?.role || data.user.user_metadata?.role || "student";
+    // Only the server-side profile is authoritative. Auth user metadata is
+    // editable by the client and must never grant privileges.
+    req.role = profile?.role || "student";
     req.studentId = profile?.student_id || profile?.studentId || null;
     next();
   } catch (err) { next(err); }

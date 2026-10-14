@@ -15,7 +15,17 @@ const queryList = async (table, req, build = (q) => q) => {
 };
 const ownerFilter = (req, q, column = "student_id") => req.role === "student" ? q.eq(column, req.studentId) : q;
 
-router.get("/auth/me", authenticate, (req, res) => send(res, { user: { id: req.user.id, email: req.user.email }, role: req.role, studentId: req.studentId, profile: req.user.profile }));
+router.get("/auth/me", authenticate, async (req, res, next) => {
+  try {
+    let student = null;
+    if (req.studentId) {
+      const { data, error } = await dbRequired().from("students").select("*").eq("id", req.studentId).maybeSingle();
+      throwDb(error);
+      student = data;
+    }
+    send(res, { user: { id: req.user.id, email: req.user.email }, role: req.role, studentId: req.studentId, profile: req.user.profile, student });
+  } catch (error) { next(error); }
+});
 
 router.get("/students", ...admin, pagination, async (req, res, next) => { try { const out = await queryList("students", req, (q) => { const { search, hostel, status, department } = req.query; if (hostel && hostel !== "all") q = q.eq("hostel", hostel); if (status && status !== "all") q = q.eq("status", status); if (department) q = q.eq("department", department); if (search) { const s = String(search).replace(/[(),]/g, " "); q = q.or(`full_name.ilike.%${s}%,usn.ilike.%${s}%,email.ilike.%${s}%`); } return q.order("created_at", { ascending: false }); }); send(res, out); } catch (e) { next(e); } });
 router.get("/students/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from("students").select("*").eq("id", asId(req.params.id)).maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });

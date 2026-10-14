@@ -1,96 +1,31 @@
-import { createContext, useContext, useState, useCallback } from "react";
-
-/**
- * Lightweight auth context for NIVASA.
- *
- * ⚠️ FRONTEND-ONLY DEMONSTRATION.
- * This context does NOT provide real security. Hostel data isolation is
- * enforced via UI filtering only. A production deployment MUST enforce
- * access control on the server (e.g. Supabase RLS, API middleware).
- *
- * Admin roles:
- *   - "super"  → can see both hostels (Boys' + Girls')
- *   - "boys"   → restricted to Boys' Hostel data
- *   - "girls"  → restricted to Girls' Hostel data
- *
- * Student role:
- *   - "student" → the currently signed-in student
- */
-
-const AuthContext = createContext(null);
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import supabase from "@/lib/supabase";
+import { apiRequest } from "@/lib/apiClient";
 
 export const ADMIN_ROLES = {
-  super: { label: "Super Admin", hostel: null },
-  boys: { label: "Boys' Hostel Admin", hostel: "boys" },
-  girls: { label: "Girls' Hostel Admin", hostel: "girls" },
+  super: { label: "Administrator", hostel: null },
+  boys: { label: "Boys' Hostel Administrator", hostel: "boys" },
+  girls: { label: "Girls' Hostel Administrator", hostel: "girls" },
 };
-
-const INITIAL_AUTH = {
-  isAuthenticated: false,
-  role: null, // "super" | "boys" | "girls" | "student"
-  hostel: null, // null (super/student), "boys", "girls"
-  user: null,
-};
+const INITIAL = { isAuthenticated: false, loading: true, role: null, hostel: null, user: null, profile: null, student: null };
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState(INITIAL_AUTH);
-
-  const loginAdmin = useCallback((role = "super", user = "Admin") => {
-    const hostel = ADMIN_ROLES[role]?.hostel ?? null;
-    setAuth({ isAuthenticated: true, role, hostel, user });
+  const [auth, setAuth] = useState(INITIAL);
+  const loadSession = useCallback(async (session) => {
+    if (!session) return setAuth({ ...INITIAL, loading: false });
+    try {
+      const me = await apiRequest("/auth/me");
+      const profile = me.profile || {};
+      const isStudent = me.role === "student";
+      const student = isStudent ? (me.student || profile.student || profile.student_record || profile) : null;
+      setAuth({ isAuthenticated: true, loading: false, role: isStudent ? "student" : "super", hostel: profile.hostel || null, user: profile.full_name || session.user.email, profile, student });
+    } catch { await supabase.auth.signOut(); setAuth({ ...INITIAL, loading: false }); }
   }, []);
-
-  const loginStudent = useCallback((student) => {
-    setAuth({
-      isAuthenticated: true,
-      role: "student",
-      hostel: student?.hostelType ?? null,
-      user: student?.fullName ?? "Student",
-    });
-  }, []);
-
-  const logout = useCallback(() => {
-    setAuth(INITIAL_AUTH);
-  }, []);
-
-  /**
-   * Returns the hostel filter that should be applied to data queries.
-   * - Super admin → null (no filter — sees everything)
-   * - Boys/Girls admin → "boys" / "girls"
-   */
-  const getHostelFilter = useCallback(() => auth.hostel, [auth.hostel]);
-
-  /**
-   * Check if the user is authorized to view/manage a specific hostel's data.
-   * @param {"boys" | "girls"} hostelKey
-   */
-  const canAccessHostel = useCallback(
-    (hostelKey) => {
-      if (!auth.isAuthenticated) return false;
-      if (auth.role === "super") return true;
-      return auth.hostel === hostelKey;
-    },
-    [auth],
-  );
-
-  return (
-    <AuthContext.Provider
-      value={{
-        ...auth,
-        loginAdmin,
-        loginStudent,
-        logout,
-        getHostelFilter,
-        canAccessHostel,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  useEffect(() => { supabase.auth.getSession().then(({ data: { session } }) => loadSession(session)); const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => loadSession(session)); return () => subscription.unsubscribe(); }, [loadSession]);
+  const login = useCallback(async (identifier, password) => { const result = await apiRequest("/auth/login", { method: "POST", body: JSON.stringify({ identifier, password }) }); await supabase.auth.setSession(result.session); await loadSession(result.session); return result; }, [loadSession]);
+  const logout = useCallback(async () => { await supabase.auth.signOut(); setAuth({ ...INITIAL, loading: false }); }, []);
+  const value = useMemo(() => ({ ...auth, login, logout, loginAdmin: login, loginStudent: login, getHostelFilter: () => auth.hostel, canAccessHostel: (hostel) => auth.role === "super" || auth.hostel === hostel }), [auth, login, logout]);
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
-  return ctx;
-}
+export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used within AuthProvider"); return value; }

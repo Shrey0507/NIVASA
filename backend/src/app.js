@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import crypto from "node:crypto";
 import apiRouter from "./routes/api.js";
+import authRouter from "./routes/auth.js";
 import { isSupabaseConfigured, supabase } from "./config/supabase.js";
 import { rateLimit } from "./middleware/request.js";
 import { requestLogger } from "./middleware/logging.js";
@@ -23,6 +24,7 @@ app.get("/", (req, res) => res.json({ name: "NIVASA Smart Hostel Management API"
 app.get("/api/health/live", (req, res) => res.json({ status: "ok", service: "nivasa-api", timestamp: new Date().toISOString() }));
 app.get("/api/health/ready", (req, res) => res.status(isSupabaseConfigured() ? 200 : 503).json({ status: isSupabaseConfigured() ? "ready" : "not_ready", checks: { supabaseConfiguration: isSupabaseConfigured() ? "configured" : "missing" }, timestamp: new Date().toISOString() }));
 app.get("/api/health", async (req, res) => { let database = "unconfigured"; if (supabase) { const { error } = await supabase.from("students").select("id").limit(1); database = error ? "error" : "connected"; } res.status(database === "error" ? 503 : 200).json({ status: database === "error" ? "degraded" : "ok", database, timestamp: new Date().toISOString() }); });
+app.use("/api/auth", authRouter);
 app.use("/api", apiRouter);
 app.use(notFound);
 app.use(errorHandler);
