@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 
 import { BackgroundPixelStars } from "@/components/ui/background-pixel-stars";
 import { NivasaLogo } from "@/components/ui/nivasa-logo";
@@ -32,13 +32,12 @@ export function AuthLayout({ children, footer }) {
         }}
       />
 
-      {/* ── Top bar ─────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <div className="relative z-10 flex items-center justify-between p-5 lg:p-6">
         <NivasaLogo size={34} wordmark />
-        {/* Theme toggle intentionally omitted on login pages */}
       </div>
 
-      {/* ── Centered card ───────────────────────────────────────────── */}
+      {/* Centered card */}
       <div className="relative z-10 flex flex-1 items-center justify-center px-5 pb-10 lg:px-6">
         <div
           className="w-full max-w-[400px] rounded-2xl border border-white/10 p-7 shadow-2xl"
@@ -53,7 +52,7 @@ export function AuthLayout({ children, footer }) {
         </div>
       </div>
 
-      {/* ── Bottom links ────────────────────────────────────────────── */}
+      {/* Bottom links */}
       <div className="relative z-10 pb-5 text-center text-xs text-white/35 lg:pb-6">
         <Link
           to="/admin/login"
@@ -61,16 +60,16 @@ export function AuthLayout({ children, footer }) {
         >
           Admin
         </Link>
-        <span className="px-2 opacity-50">·</span>
+        <span className="px-2 opacity-50">|</span>
         <Link
           to="/student/login"
           className="hover:text-white/80 transition-colors"
         >
           Student
         </Link>
-        <span className="px-2 opacity-50">·</span>
+        <span className="px-2 opacity-50">|</span>
         <span className="text-white/25">
-          © {new Date().getFullYear()} SJBIT · NIVASA
+          {new Date().getFullYear()} SJBIT — NIVASA
         </span>
       </div>
     </div>

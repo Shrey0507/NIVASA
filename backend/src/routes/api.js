@@ -15,6 +15,17 @@ const queryList = async (table, req, build = (q) => q) => {
 };
 const ownerFilter = (req, q, column = "student_id") => req.role === "student" ? q.eq(column, req.studentId) : q;
 
+// Hostel scope: hostel_admin sees only their hostel's data. super_admin sees all.
+const getAdminHostelScope = (req) => {
+  if (req.role === "super_admin") return null; // no filter
+  return req.user?.profile?.hostel || null;
+};
+const applyHostelScope = (req, q, column = "hostel") => {
+  const scope = getAdminHostelScope(req);
+  if (scope) q = q.eq(column, scope);
+  return q;
+};
+
 router.get("/auth/me", authenticate, async (req, res, next) => {
   try {
     let student = null;
@@ -27,11 +38,11 @@ router.get("/auth/me", authenticate, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-router.get("/students", ...admin, pagination, async (req, res, next) => { try { const out = await queryList("students", req, (q) => { const { search, hostel, status, department } = req.query; if (hostel && hostel !== "all") q = q.eq("hostel", hostel); if (status && status !== "all") q = q.eq("status", status); if (department) q = q.eq("department", department); if (search) { const s = String(search).replace(/[(),]/g, " "); q = q.or(`full_name.ilike.%${s}%,usn.ilike.%${s}%,email.ilike.%${s}%`); } return q.order("created_at", { ascending: false }); }); send(res, out); } catch (e) { next(e); } });
-router.get("/students/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from("students").select("*").eq("id", asId(req.params.id)).maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
-router.post("/students", ...admin, body(["usn", "full_name", "email", "hostel"]), async (req, res, next) => { try { const allowed = ["usn", "full_name", "email", "phone", "department", "year", "hostel", "guardian_details", "address", "emergency_contact", "status"]; const { data, error } = await dbRequired().from("students").insert(cleanPatch(req.body, allowed)).select().single(); if (error?.code === "23505") throw new AppError(409, "Student ID or email already exists", "DUPLICATE"); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
-router.patch("/students/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from("students").update(cleanPatch(req.body, ["usn", "full_name", "email", "phone", "department", "year", "hostel", "guardian_details", "address", "emergency_contact", "status"])).eq("id", asId(req.params.id)).select().maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
-router.delete("/students/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from("students").update({ status: "inactive" }).eq("id", asId(req.params.id)).select().maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
+router.get("/students", ...admin, pagination, async (req, res, next) => { try { const out = await queryList("students", req, (q) => { q = applyHostelScope(req, q); const { search, hostel, status, department } = req.query; if (hostel && hostel !== "all") q = q.eq("hostel", hostel); if (status && status !== "all") q = q.eq("status", status); if (department) q = q.eq("department", department); if (search) { const s = String(search).replace(/[(),]/g, " "); q = q.or(`full_name.ilike.%${s}%,usn.ilike.%${s}%,email.ilike.%${s}%`); } return q.order("created_at", { ascending: false }); }); send(res, out); } catch (e) { next(e); } });
+router.get("/students/:id", ...admin, async (req, res, next) => { try { let q = dbRequired().from("students").select("*").eq("id", asId(req.params.id)); q = applyHostelScope(req, q); const { data, error } = await q.maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
+router.post("/students", ...admin, body(["usn", "full_name", "email", "hostel"]), async (req, res, next) => { try { const scope = getAdminHostelScope(req); if (scope && req.body.hostel !== scope) throw new AppError(403, "You can only create students in your assigned hostel", "HOSTEL_SCOPE_FORBIDDEN"); const allowed = ["usn", "full_name", "email", "phone", "department", "year", "hostel", "guardian_details", "address", "emergency_contact", "status"]; const { data, error } = await dbRequired().from("students").insert(cleanPatch(req.body, allowed)).select().single(); if (error?.code === "23505") throw new AppError(409, "Student ID or email already exists", "DUPLICATE"); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
+router.patch("/students/:id", ...admin, async (req, res, next) => { try { const scope = getAdminHostelScope(req); if (scope && req.body.hostel && req.body.hostel !== scope) throw new AppError(403, "You cannot move students to another hostel", "HOSTEL_SCOPE_FORBIDDEN"); let q = dbRequired().from("students").update(cleanPatch(req.body, ["usn", "full_name", "email", "phone", "department", "year", "hostel", "guardian_details", "address", "emergency_contact", "status"])).eq("id", asId(req.params.id)); q = applyHostelScope(req, q); const { data, error } = await q.select().maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
+router.delete("/students/:id", ...admin, async (req, res, next) => { try { let q = dbRequired().from("students").update({ status: "inactive" }).eq("id", asId(req.params.id)); q = applyHostelScope(req, q); const { data, error } = await q.select().maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Student not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
 
 for (const [path, table] of [["hostels", "hostels"], ["blocks", "blocks"], ["rooms", "rooms"]]) {
   router.get(`/${path}`, ...staffOrStudent, pagination, async (req, res, next) => { try { send(res, await queryList(table, req, (q) => { if (req.query.hostel_id) q = q.eq("hostel_id", req.query.hostel_id); if (req.query.block_id) q = q.eq("block_id", req.query.block_id); if (req.query.status) q = q.eq("status", req.query.status); return q; })); } catch (e) { next(e); } });
@@ -42,13 +53,35 @@ router.post("/allocations", ...admin, body(["student_id", "room_id"]), async (re
 router.delete("/allocations/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().rpc("vacate_room", { p_allocation_id: asId(req.params.id) }); if (error) { if (error.code === "42883") throw new AppError(501, "Atomic vacation function is not installed; apply the additive migration first", "MIGRATION_REQUIRED"); throwDb(error); } send(res, data); } catch (e) { next(e); } });
 
 const listOwned = (path, table, roles = ["admin", "super_admin", "hostel_admin", "warden", "student"]) => {
-  router.get(path, authenticate, requireRole(...roles), pagination, async (req, res, next) => { try { send(res, await queryList(table, req, (q) => { q = ownerFilter(req, q); if (req.query.status) q = q.eq("status", req.query.status); return q.order("created_at", { ascending: false }); })); } catch (e) { next(e); } });
+  router.get(path, authenticate, requireRole(...roles), pagination, async (req, res, next) => {
+    try {
+      // For hostel-scoped admins, we need to filter by the student's hostel.
+      // First apply student ownership filter (for students), then hostel scope (for admins).
+      const scope = getAdminHostelScope(req);
+      let hostelStudentIds = null;
+      if (scope && req.role !== "student") {
+        // Get student IDs belonging to this admin's hostel
+        const { data: scopedStudents, error: scopeErr } = await dbRequired()
+          .from("students").select("id").eq("hostel", scope);
+        if (scopeErr) throw scopeErr;
+        hostelStudentIds = (scopedStudents || []).map(s => s.id);
+      }
+      send(res, await queryList(table, req, (q) => {
+        q = ownerFilter(req, q);
+        if (hostelStudentIds !== null) {
+          q = q.in("student_id", hostelStudentIds.length > 0 ? hostelStudentIds : ["00000000-0000-0000-0000-000000000000"]);
+        }
+        if (req.query.status) q = q.eq("status", req.query.status);
+        return q.order("created_at", { ascending: false });
+      }));
+    } catch (e) { next(e); }
+  });
 };
 listOwned("/fees", tables.fees); listOwned("/movements", "movements"); listOwned("/grievances", "grievances");
 router.post("/fees", ...admin, body(["student_id", "amount", "fee_type", "due_date"]), async (req, res, next) => { try { const { data, error } = await dbRequired().from(tables.fees).insert(cleanPatch(req.body, ["student_id", "amount", "fee_type", "due_date", "status", "payment_method", "reference"])).select().single(); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
 router.patch("/fees/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from(tables.fees).update(cleanPatch(req.body, ["amount", "fee_type", "due_date", "paid_date", "status", "payment_method", "reference"])).eq("id", asId(req.params.id)).select().single(); throwDb(error); send(res, data); } catch (e) { next(e); } });
-router.post("/movements", authenticate, requireStudent, body(["movement_type", "destination", "reason", "expected_return"]), async (req, res, next) => { try { const { data, error } = await dbRequired().from("movements").insert({ ...cleanPatch(req.body, ["movement_type", "destination", "reason", "expected_return", "expected_return_time"]), student_id: req.studentId }).select().single(); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
-router.post("/movements/:id/return", authenticate, async (req, res, next) => { try { let q = dbRequired().from("movements").update({ actual_return: new Date().toISOString(), actual_return_time: new Date().toISOString(), status: "returned" }).eq("id", asId(req.params.id)); if (req.role === "student") q = q.eq("student_id", req.studentId); const { data, error } = await q.select().maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Movement not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
+router.post("/movements", authenticate, requireStudent, body(["reason", "expected_return_time"]), async (req, res, next) => { try { const insert = { purpose: req.body.reason || req.body.purpose || "", destination: req.body.destination || "", expected_return_time: req.body.expected_return_time || req.body.expected_return, student_id: req.studentId }; const { data, error } = await dbRequired().from("movements").insert(insert).select().single(); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
+router.post("/movements/:id/return", authenticate, async (req, res, next) => { try { let q = dbRequired().from("movements").update({ actual_return_time: new Date().toISOString(), status: "returned" }).eq("id", asId(req.params.id)); if (req.role === "student") q = q.eq("student_id", req.studentId); const { data, error } = await q.select().maybeSingle(); throwDb(error); if (!data) throw new AppError(404, "Movement not found", "NOT_FOUND"); send(res, data); } catch (e) { next(e); } });
 router.post("/grievances", authenticate, requireStudent, body(["title", "category", "description"]), async (req, res, next) => { try { const { data, error } = await dbRequired().from("grievances").insert({ ...cleanPatch(req.body, ["title", "category", "description"]), student_id: req.studentId }).select().single(); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
 router.patch("/grievances/:id", ...admin, async (req, res, next) => { try { const patch = cleanPatch(req.body, ["status", "priority", "response", "resolution_notes", "assigned_to", "resolved_at"]); const { data, error } = await dbRequired().from("grievances").update(patch).eq("id", asId(req.params.id)).select().single(); throwDb(error); send(res, data); } catch (e) { next(e); } });
 
@@ -61,6 +94,35 @@ router.get("/mess", authenticate, pagination, async (req, res, next) => { try { 
 router.post("/mess", ...admin, body(["menu_date"]), async (req, res, next) => { try { const { data, error } = await dbRequired().from(tables.mess).insert(cleanPatch(req.body, ["menu_date", "breakfast", "lunch", "snacks", "dinner", "timings"])).select().single(); throwDb(error); send(res, data, 201); } catch (e) { next(e); } });
 router.patch("/mess/:id", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from(tables.mess).update(cleanPatch(req.body, ["menu_date", "breakfast", "lunch", "snacks", "dinner", "timings"])).eq("id", asId(req.params.id)).select().single(); throwDb(error); send(res, data); } catch (e) { next(e); } });
 
-router.get("/dashboard", authenticate, async (req, res, next) => { try { const db = dbRequired(); const names = ["students", "rooms", tables.fees, "grievances", "movements", "notices"]; const results = await Promise.all(names.map((table) => { let q = db.from(table).select("id", { count: "exact", head: true }); if (req.role === "student" && [tables.fees, "grievances", "movements"].includes(table)) q = q.eq("student_id", req.studentId); return q; })); const counts = Object.fromEntries(names.map((name, i) => [name, results[i].count || 0])); if (results.some((r) => r.error)) throw new AppError(503, "Dashboard data is unavailable", "DATABASE_ERROR"); send(res, { counts, generatedAt: new Date().toISOString() }); } catch (e) { next(e); } });
+router.get("/dashboard", authenticate, async (req, res, next) => {
+  try {
+    const db = dbRequired();
+    const names = ["students", "rooms", tables.fees, "grievances", "movements", "notices"];
+    const scope = getAdminHostelScope(req);
+    let hostelStudentIds = null;
+    if (scope && req.role !== "student") {
+      const { data: scopedStudents } = await db.from("students").select("id").eq("hostel", scope);
+      hostelStudentIds = (scopedStudents || []).map((s) => s.id);
+    }
+    const results = await Promise.all(
+      names.map((table) => {
+        let q = db.from(table).select("id", { count: "exact", head: true });
+        if (req.role === "student") {
+          if ([tables.fees, "grievances", "movements"].includes(table)) q = q.eq("student_id", req.studentId);
+        } else if (scope) {
+          if (table === "students") {
+            q = q.eq("hostel", scope);
+          } else if ([tables.fees, "grievances", "movements"].includes(table)) {
+            q = q.in("student_id", hostelStudentIds && hostelStudentIds.length > 0 ? hostelStudentIds : ["00000000-0000-0000-0000-000000000000"]);
+          }
+        }
+        return q;
+      })
+    );
+    const counts = Object.fromEntries(names.map((name, i) => [name, results[i].count || 0]));
+    if (results.some((r) => r.error)) throw new AppError(503, "Dashboard data is unavailable", "DATABASE_ERROR");
+    send(res, { counts, generatedAt: new Date().toISOString() });
+  } catch (e) { next(e); }
+});
 
 export default router;

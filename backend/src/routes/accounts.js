@@ -14,7 +14,18 @@ const scopeOf = (req) => normalize(req.user.profile?.hostel || req.user.profile?
 const canManageHostel = (req, hostel) => req.role === "super_admin" || (req.role === "hostel_admin" && scopeOf(req) === hostel);
 const cleanupAuthUser = async (id) => { if (id && supabaseAdmin) { try { await supabaseAdmin.auth.admin.deleteUser(id); } catch { /* best effort */ } } };
 
-router.get("/", ...admin, async (req, res, next) => { try { const { data, error } = await dbRequired().from("user_profiles").select("id,full_name,email,username,role,student_id,hostel,status,created_at").order("created_at", { ascending: false }); throwDb(error); res.json({ data: data || [] }); } catch (error) { next(error); } });
+router.get("/", ...admin, async (req, res, next) => {
+  try {
+    let q = dbRequired().from("user_profiles").select("id,full_name,email,username,role,student_id,hostel,status,created_at");
+    if (req.role === "hostel_admin") {
+      const scope = scopeOf(req);
+      if (scope) q = q.eq("hostel", scope);
+    }
+    const { data, error } = await q.order("created_at", { ascending: false });
+    throwDb(error);
+    res.json({ data: data || [] });
+  } catch (error) { next(error); }
+});
 
 router.post("/students", ...admin, body(["usn", "full_name", "email", "username", "hostel"]), async (req, res, next) => {
   let authUserId; let createdStudentId;
